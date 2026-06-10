@@ -9,16 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { detectLanguage, toMonacoLanguage, type LanguageName } from "@/lib/detect-language";
 
-const languageOptions = [
+const languageOptions: LanguageName[] = [
+  "Plain Text",
   "TypeScript",
   "JavaScript",
   "Python",
   "Java",
+  "C",
+  "C++",
   "Go",
   "Rust",
-  "C#",
+  "HTML",
+  "CSS",
   "SQL",
+  "Bash",
+  "JSON",
 ];
 
 const starterCode = `const getUserDisplayName = (user) => {
@@ -37,38 +44,34 @@ const summaryCards = [
   { label: "Code Quality", value: "4 suggestions", tone: "text-fuchsia-300" },
 ];
 
-function getMonacoLanguage(value: string) {
-  switch (value) {
-    case "TypeScript":
-      return "typescript";
-    case "JavaScript":
-      return "javascript";
-    case "Python":
-      return "python";
-    case "Java":
-      return "java";
-    case "Go":
-      return "go";
-    case "Rust":
-      return "rust";
-    case "C#":
-      return "csharp";
-    case "SQL":
-      return "sql";
-    default:
-      return "plaintext";
-  }
-}
-
 export function ReviewWorkspace() {
   const [code, setCode] = useState(starterCode);
-  const [language, setLanguage] = useState("TypeScript");
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageName>(() => detectLanguage(starterCode));
+  const [isManualLanguage, setIsManualLanguage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const lineCount = useMemo(() => code.split("\n").length, [code]);
+  const detectedLanguage = useMemo(() => detectLanguage(code), [code]);
+
+  function updateCode(nextCode: string) {
+    const nextDetectedLanguage = detectLanguage(nextCode);
+
+    setCode(nextCode);
+
+    if (!isManualLanguage) {
+      setSelectedLanguage(nextDetectedLanguage);
+    }
+  }
+
+  function handleAutoDetect() {
+    const nextDetectedLanguage = detectLanguage(code);
+
+    setIsManualLanguage(false);
+    setSelectedLanguage(nextDetectedLanguage);
+  }
 
   function handleClear() {
-    setCode("");
+    updateCode("");
   }
 
   function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
@@ -81,7 +84,7 @@ export function ReviewWorkspace() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      setCode(String(reader.result ?? ""));
+      updateCode(String(reader.result ?? ""));
     };
 
     reader.readAsText(file);
@@ -127,8 +130,20 @@ export function ReviewWorkspace() {
               <CardContent className="px-0 pb-0 pt-0">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-1">
-                    <Label htmlFor="language">Language</Label>
-                    <Select id="language" value={language} onChange={(event) => setLanguage(event.target.value)}>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="language">Language</Label>
+                      <Button variant="ghost" type="button" className="h-8 px-3 text-xs" onClick={handleAutoDetect}>
+                        Auto detect
+                      </Button>
+                    </div>
+                    <Select
+                      id="language"
+                      value={selectedLanguage}
+                      onChange={(event) => {
+                        setSelectedLanguage(event.target.value as LanguageName);
+                        setIsManualLanguage(true);
+                      }}
+                    >
                       {languageOptions.map((option) => (
                         <option key={option} value={option} className="bg-black text-white">
                           {option}
@@ -151,12 +166,25 @@ export function ReviewWorkspace() {
                 </div>
 
                 <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-[#030303] p-1 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3 text-xs text-slate-400">
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
+                      Detected: {detectedLanguage}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
+                      Editor: {selectedLanguage}
+                    </span>
+                    {isManualLanguage ? (
+                      <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-emerald-200">
+                        Manual override
+                      </span>
+                    ) : null}
+                  </div>
                   <Editor
                     height="520px"
                     defaultLanguage="typescript"
-                    language={getMonacoLanguage(language)}
+                    language={toMonacoLanguage(selectedLanguage)}
                     value={code}
-                    onChange={(value) => setCode(value ?? "")}
+                    onChange={(value) => updateCode(value ?? "")}
                     theme="vs-dark"
                     options={{
                       fontSize: 14,
