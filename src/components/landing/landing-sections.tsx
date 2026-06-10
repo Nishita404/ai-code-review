@@ -136,10 +136,10 @@ export function LandingSections() {
               const Icon = item.icon;
 
               return (
-                <Card key={item.title} className="border-white/10 bg-white/[0.03]">
+                <Card key={item.title} className="group border-white/10 bg-white/[0.03] transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:border-emerald-400/25 hover:shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_0_1px_rgba(52,211,153,0.08),0_0_24px_rgba(16,185,129,0.08)]">
                   <CardHeader className="pb-3">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-                      <Icon className="h-5 w-5 text-white" />
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] transition-all duration-300 ease-out group-hover:border-emerald-400/20 group-hover:bg-emerald-400/10">
+                      <Icon className="h-5 w-5 text-white transition-all duration-300 ease-out group-hover:text-emerald-300 group-hover:drop-shadow-[0_0_10px_rgba(52,211,153,0.35)]" />
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
