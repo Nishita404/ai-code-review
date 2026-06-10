@@ -1,8 +1,7 @@
 import { Cormorant_Garamond } from "next/font/google";
 import { BrainCircuit, Code2, ShieldCheck, Sparkles, Target, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,7 +163,7 @@ export function LandingSections() {
             </p>
           </div>
 
-          <div className="rounded-[1.5rem] border border-white/10 bg-[#050505] p-5">
+          <div className="rounded-[1.5rem] border border-white/10 bg-[#050505] p-5 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-emerald-400/20 hover:shadow-[0_18px_48px_rgba(0,0,0,0.45),0_0_0_1px_rgba(52,211,153,0.08),0_0_24px_rgba(52,211,153,0.08)]">
             <div className="space-y-5">
               <div className="space-y-2">
                 <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Create account</p>
