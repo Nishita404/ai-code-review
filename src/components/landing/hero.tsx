@@ -39,7 +39,7 @@ export function Hero() {
             <div id="get-started" className="space-y-4">
               <HeroActions />
               <p className="text-sm leading-6 text-slate-400">
-                No auth, no backend, no distractions yet. This is the first polished landing page for the MVP.
+                Built for a focused code review experience with a clean path from paste to insight.
               </p>
             </div>
           </div>
