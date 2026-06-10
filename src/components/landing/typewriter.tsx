@@ -57,9 +57,14 @@ export function Typewriter({ phrases }: TypewriterProps) {
   }, [charIndex, isDeleting, phraseIndex, phrases]);
 
   return (
-    <span className="inline-flex min-h-[1.5em] items-center text-slate-100">
-      <span>{displayText}</span>
-      <span className="ml-1 inline-block h-[1.2em] w-[2px] bg-white/80 motion-safe:animate-pulse" aria-hidden="true" />
+    <span className="inline-flex min-h-[1.5em] items-center text-[0.9em] font-medium leading-none tracking-tight">
+      <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-lime-300 bg-clip-text text-transparent [text-shadow:0_0_10px_rgba(34,197,94,0.32),0_0_18px_rgba(34,211,238,0.24)]">
+        {displayText}
+      </span>
+      <span
+        className="ml-1 inline-block h-[1.2em] w-[2px] bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.6)] motion-safe:animate-pulse"
+        aria-hidden="true"
+      />
     </span>
   );
 }
