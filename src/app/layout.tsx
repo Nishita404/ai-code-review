@@ -15,7 +15,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "AI Code Review Platform",
-  description: "Paste code, detect the language, and prepare AI-powered code reviews.",
+  description: "A polished AI-powered code review landing page built with Next.js, TypeScript, Tailwind, and Bun.",
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="en"
       className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[radial-gradient(circle_at_top_left,_rgba(255,195,113,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(110,231,183,0.16),_transparent_24%),linear-gradient(180deg,_#fffdf8_0%,_#f7f3eb_48%,_#f1efe8_100%)] text-slate-950">
+      <body className="min-h-full bg-[#070b14] text-slate-50">
         {children}
       </body>
     </html>
