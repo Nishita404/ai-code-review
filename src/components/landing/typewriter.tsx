@@ -1,23 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Volume2, VolumeX } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 type TypewriterProps = {
   phrases: string[];
+  soundEnabled?: boolean;
 };
 
 const typingDelay = 70;
 const deletingDelay = 40;
 const pauseDelay = 1200;
 
-export function Typewriter({ phrases }: TypewriterProps) {
+export function Typewriter({ phrases, soundEnabled = false }: TypewriterProps) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [displayText, setDisplayText] = useState("");
-  const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   function ensureAudioContext() {
@@ -40,7 +38,7 @@ export function Typewriter({ phrases }: TypewriterProps) {
   }
 
   const playTypingClick = useCallback(() => {
-    if (!isSoundEnabled) {
+    if (!soundEnabled) {
       return;
     }
 
@@ -57,18 +55,19 @@ export function Typewriter({ phrases }: TypewriterProps) {
     const gainNode = audioContext.createGain();
 
     oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(1700 + Math.random() * 180, currentTime);
+    oscillator.frequency.setValueAtTime(1200 + Math.random() * 320, currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(950 + Math.random() * 240, currentTime + 0.018);
 
     gainNode.gain.setValueAtTime(0.00001, currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.007, currentTime + 0.003);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, currentTime + 0.03);
+    gainNode.gain.exponentialRampToValueAtTime(0.0022, currentTime + 0.002);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, currentTime + 0.022);
 
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
     oscillator.start(currentTime);
     oscillator.stop(currentTime + 0.04);
-  }, [isSoundEnabled]);
+  }, [soundEnabled]);
 
   useEffect(() => {
     if (!phrases.length) {
@@ -82,7 +81,11 @@ export function Typewriter({ phrases }: TypewriterProps) {
       timeoutId = setTimeout(() => {
         const nextCharIndex = charIndex + 1;
 
-        playTypingClick();
+        const nextChar = currentPhrase[nextCharIndex - 1];
+
+        if (nextChar !== " ") {
+          playTypingClick();
+        }
 
         setCharIndex(nextCharIndex);
         setDisplayText(currentPhrase.slice(0, nextCharIndex));
@@ -123,25 +126,6 @@ export function Typewriter({ phrases }: TypewriterProps) {
           aria-hidden="true"
         />
       </span>
-
-      <Button
-        type="button"
-        variant="ghost"
-        aria-pressed={isSoundEnabled}
-        onClick={() => {
-          const nextValue = !isSoundEnabled;
-
-          setIsSoundEnabled(nextValue);
-
-          if (nextValue) {
-            void ensureAudioContext()?.resume();
-          }
-        }}
-        className="h-7 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-medium text-slate-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
-      >
-        {isSoundEnabled ? <Volume2 className="mr-1 h-3.5 w-3.5" /> : <VolumeX className="mr-1 h-3.5 w-3.5" />}
-        Sound {isSoundEnabled ? "on" : "off"}
-      </Button>
     </span>
   );
 }
