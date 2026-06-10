@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type TypewriterProps = {
   phrases: string[];
@@ -15,6 +17,58 @@ export function Typewriter({ phrases }: TypewriterProps) {
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [displayText, setDisplayText] = useState("");
+  const [isSoundEnabled, setIsSoundEnabled] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  function ensureAudioContext() {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const AudioContextConstructor =
+      window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioContextConstructor) {
+      return null;
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextConstructor();
+    }
+
+    return audioContextRef.current;
+  }
+
+  const playTypingClick = useCallback(() => {
+    if (!isSoundEnabled) {
+      return;
+    }
+
+    const audioContext = ensureAudioContext();
+
+    if (!audioContext) {
+      return;
+    }
+
+    void audioContext.resume();
+
+    const currentTime = audioContext.currentTime;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(1700 + Math.random() * 180, currentTime);
+
+    gainNode.gain.setValueAtTime(0.00001, currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.007, currentTime + 0.003);
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, currentTime + 0.03);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start(currentTime);
+    oscillator.stop(currentTime + 0.04);
+  }, [isSoundEnabled]);
 
   useEffect(() => {
     if (!phrases.length) {
@@ -27,6 +81,8 @@ export function Typewriter({ phrases }: TypewriterProps) {
     if (!isDeleting && charIndex < currentPhrase.length) {
       timeoutId = setTimeout(() => {
         const nextCharIndex = charIndex + 1;
+
+        playTypingClick();
 
         setCharIndex(nextCharIndex);
         setDisplayText(currentPhrase.slice(0, nextCharIndex));
@@ -54,17 +110,38 @@ export function Typewriter({ phrases }: TypewriterProps) {
         clearTimeout(timeoutId);
       }
     };
-  }, [charIndex, isDeleting, phraseIndex, phrases]);
+  }, [charIndex, isDeleting, playTypingClick, phraseIndex, phrases]);
 
   return (
-    <span className="inline-flex min-h-[1.5em] items-center text-[0.9em] font-medium leading-none tracking-tight">
-      <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-lime-300 bg-clip-text text-transparent [text-shadow:0_0_10px_rgba(34,197,94,0.32),0_0_18px_rgba(34,211,238,0.24)]">
-        {displayText}
+    <span className="inline-flex flex-wrap items-center gap-2 text-[0.9em] font-medium leading-none tracking-tight">
+      <span className="inline-flex min-h-[1.5em] items-center">
+        <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-lime-300 bg-clip-text text-transparent [text-shadow:0_0_10px_rgba(34,197,94,0.32),0_0_18px_rgba(34,211,238,0.24)]">
+          {displayText}
+        </span>
+        <span
+          className="ml-1 inline-block h-[1.2em] w-[2px] bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.6)] motion-safe:animate-pulse"
+          aria-hidden="true"
+        />
       </span>
-      <span
-        className="ml-1 inline-block h-[1.2em] w-[2px] bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.6)] motion-safe:animate-pulse"
-        aria-hidden="true"
-      />
+
+      <Button
+        type="button"
+        variant="ghost"
+        aria-pressed={isSoundEnabled}
+        onClick={() => {
+          const nextValue = !isSoundEnabled;
+
+          setIsSoundEnabled(nextValue);
+
+          if (nextValue) {
+            void ensureAudioContext()?.resume();
+          }
+        }}
+        className="h-7 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-medium text-slate-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+      >
+        {isSoundEnabled ? <Volume2 className="mr-1 h-3.5 w-3.5" /> : <VolumeX className="mr-1 h-3.5 w-3.5" />}
+        Sound {isSoundEnabled ? "on" : "off"}
+      </Button>
     </span>
   );
 }
