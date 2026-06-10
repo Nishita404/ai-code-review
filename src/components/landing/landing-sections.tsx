@@ -1,8 +1,11 @@
 import { Cormorant_Garamond } from "next/font/google";
-import { ArrowRight, BrainCircuit, Code2, ShieldCheck, Sparkles, Target, Wand2 } from "lucide-react";
+import { BrainCircuit, Code2, ShieldCheck, Sparkles, Target, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Typewriter } from "@/components/landing/typewriter";
 import { CodePreviewCard } from "@/components/landing/code-preview-card";
 
@@ -152,31 +155,50 @@ export function LandingSections() {
       <section className="bg-[#000000] px-4 py-24 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-full max-w-7xl gap-8 rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div className="space-y-4">
-            <Badge className="border-white/10 bg-white/[0.04] text-slate-200">Early access</Badge>
+            <Badge className="border-white/10 bg-white/[0.04] text-slate-200">Registration</Badge>
             <h2 className={`text-4xl font-semibold tracking-tight text-white sm:text-5xl ${serifDisplay.className}`}>
-              Join the waitlist for a cleaner AI review workflow.
+              Create your account and start reviewing code.
             </h2>
             <p className="max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              No login yet. No real authentication yet. Just a polished waiting area for the next step of the product.
+              A minimal registration form for the UI flow, designed to feel calm, premium, and ready for the next step.
             </p>
           </div>
 
-          <div className="flex flex-col justify-between gap-4 rounded-[1.5rem] border border-white/10 bg-[#050505] p-5">
-            <div className="space-y-2">
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Join the waitlist</p>
-              <p className="text-sm leading-6 text-slate-400">
-                A minimal login-style CTA now, with the actual auth flow coming later.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <div className="rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-400">
-                email@company.com
+          <div className="rounded-[1.5rem] border border-white/10 bg-[#050505] p-5">
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Create account</p>
+                <p className="text-sm leading-6 text-slate-400">
+                  Keep it simple. Enter your details and continue into the review workspace.
+                </p>
               </div>
-              <ButtonLink href="#" className="h-12 px-6">
-                Request access
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </ButtonLink>
+
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" name="name" type="text" placeholder="Alex Morgan" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" name="email" type="email" placeholder="alex@company.com" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" name="password" type="password" placeholder="Create a password" />
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <Button className="h-12 w-full px-6">Create account</Button>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-400 transition hover:text-white"
+                >
+                  Already have an account? Sign in
+                </button>
+              </div>
             </div>
           </div>
         </div>
