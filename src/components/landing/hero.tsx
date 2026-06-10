@@ -1,5 +1,13 @@
 import { CodePreviewCard } from "@/components/landing/code-preview-card";
 import { HeroActions } from "@/components/landing/hero-actions";
+import { Typewriter } from "@/components/landing/typewriter";
+
+const phrases = [
+  "Review code before it breaks.",
+  "Find bugs before users do.",
+  "Ship cleaner code with AI.",
+  "Detect security risks instantly.",
+];
 
 export function Hero() {
   return (
@@ -17,9 +25,12 @@ export function Hero() {
               <p id="learn-more" className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">
                 AI Code Review Platform
               </p>
-              <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl">
-                Review code faster with a clean, AI-first workflow.
-              </h1>
+              <div className="max-w-3xl text-5xl font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl">
+                <div className="mb-3 text-sm font-medium uppercase tracking-[0.32em] text-slate-500">
+                  AI review engine
+                </div>
+                <Typewriter phrases={phrases} />
+              </div>
               <p className="max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
                 Paste code, detect the language, and prepare a structured AI review flow that highlights bugs, security concerns, performance issues, and code quality feedback.
               </p>
