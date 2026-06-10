@@ -59,7 +59,7 @@ export function Typewriter({ phrases }: TypewriterProps) {
   return (
     <span className="inline-flex min-h-[1.5em] items-center text-slate-100">
       <span>{displayText}</span>
-      <span className="ml-1 inline-block h-[1.2em] w-[2px] bg-sky-400 motion-safe:animate-pulse" aria-hidden="true" />
+      <span className="ml-1 inline-block h-[1.2em] w-[2px] bg-white/80 motion-safe:animate-pulse" aria-hidden="true" />
     </span>
   );
 }

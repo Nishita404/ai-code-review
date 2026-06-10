@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="en"
       className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[#070b14] text-slate-50">
+      <body className="min-h-full bg-black text-slate-50">
         {children}
       </body>
     </html>

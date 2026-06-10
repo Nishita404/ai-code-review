@@ -30,13 +30,13 @@ const featureItems = [
 
 export function LandingSections() {
   return (
-    <main className="bg-[#050814] text-white">
+    <main className="bg-[#000000] text-white">
       <section className="relative min-h-screen overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_18%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.04),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.03),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.015),transparent_18%)]" />
         <div className="relative mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid w-full gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div className="max-w-2xl space-y-8">
-              <Badge className="border-sky-400/20 bg-sky-400/10 text-sky-200">
+              <Badge className="border-white/10 bg-white/5 text-slate-200">
                 AI-powered code review for teams and builders
               </Badge>
 
@@ -72,14 +72,14 @@ export function LandingSections() {
         </div>
       </section>
 
-      <section className="border-b border-white/5 bg-[#070c16]">
+      <section className="border-b border-white/5 bg-[#050505]">
         <div className="mx-auto grid min-h-[80vh] w-full max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8">
           <div className="order-2 lg:order-1">
             <CodePreviewCard />
           </div>
 
           <div className="order-1 max-w-2xl space-y-8 lg:order-2 lg:justify-self-end">
-            <Badge className="border-white/10 bg-white/5 text-slate-300">
+            <Badge className="border-white/10 bg-white/[0.04] text-slate-300">
               Faster signal, less noise
             </Badge>
 
@@ -116,10 +116,10 @@ export function LandingSections() {
         </div>
       </section>
 
-      <section id="features" className="border-b border-white/5 bg-[#050814] px-4 py-20 sm:px-6 lg:px-8">
+      <section id="features" className="border-b border-white/5 bg-[#030303] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <div className="max-w-2xl space-y-4">
-            <Badge className="border-white/10 bg-white/5 text-slate-300">Core features</Badge>
+            <Badge className="border-white/10 bg-white/[0.04] text-slate-300">Core features</Badge>
             <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
               Minimal review surface, built for the MVP.
             </h2>
@@ -135,8 +135,8 @@ export function LandingSections() {
               return (
                 <Card key={item.title} className="border-white/10 bg-white/[0.03]">
                   <CardHeader className="pb-3">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                      <Icon className="h-5 w-5 text-sky-300" />
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
+                      <Icon className="h-5 w-5 text-white" />
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
@@ -149,10 +149,10 @@ export function LandingSections() {
         </div>
       </section>
 
-      <section className="bg-[#070c16] px-4 py-24 sm:px-6 lg:px-8">
-        <div className="mx-auto grid w-full max-w-7xl gap-8 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
+      <section className="bg-[#000000] px-4 py-24 sm:px-6 lg:px-8">
+        <div className="mx-auto grid w-full max-w-7xl gap-8 rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div className="space-y-4">
-            <Badge className="border-sky-400/20 bg-sky-400/10 text-sky-200">Early access</Badge>
+            <Badge className="border-white/10 bg-white/[0.04] text-slate-200">Early access</Badge>
             <h2 className={`text-4xl font-semibold tracking-tight text-white sm:text-5xl ${serifDisplay.className}`}>
               Join the waitlist for a cleaner AI review workflow.
             </h2>
@@ -161,7 +161,7 @@ export function LandingSections() {
             </p>
           </div>
 
-          <div className="flex flex-col justify-between gap-4 rounded-[1.5rem] border border-white/10 bg-[#050814] p-5">
+          <div className="flex flex-col justify-between gap-4 rounded-[1.5rem] border border-white/10 bg-[#050505] p-5">
             <div className="space-y-2">
               <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Join the waitlist</p>
               <p className="text-sm leading-6 text-slate-400">
