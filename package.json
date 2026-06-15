@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "auth:generate": "bunx auth@latest generate --config src/lib/auth.generate.ts --output src/db/schema.ts --adapter drizzle --dialect postgresql -y"
+    "auth:generate": "bunx auth@latest generate --config src/lib/auth.generate.ts --output src/db/schema.ts --adapter drizzle --dialect postgresql -y",
+    "verify:auth": "bun --env-file=.env.local scripts/verify-auth.ts"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",

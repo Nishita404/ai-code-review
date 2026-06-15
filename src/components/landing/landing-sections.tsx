@@ -3,10 +3,9 @@ import { BrainCircuit, Code2, ShieldCheck, Sparkles, Target, Wand2 } from "lucid
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Typewriter } from "@/components/landing/typewriter";
 import { CodePreviewCard } from "@/components/landing/code-preview-card";
+import { RegistrationPanel } from "@/components/auth/registration-panel";
 
 const serifDisplay = Cormorant_Garamond({
   subsets: ["latin"],
@@ -163,43 +162,7 @@ export function LandingSections() {
             </p>
           </div>
 
-          <div className="rounded-[1.5rem] border border-white/10 bg-[#050505] p-5 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-emerald-400/20 hover:shadow-[0_18px_48px_rgba(0,0,0,0.45),0_0_0_1px_rgba(52,211,153,0.08),0_0_24px_rgba(52,211,153,0.08)]">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Create account</p>
-                <p className="text-sm leading-6 text-slate-400">
-                  Keep it simple. Enter your details and continue into the review workspace.
-                </p>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" name="name" type="text" placeholder="Alex Morgan" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" placeholder="alex@company.com" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" type="password" placeholder="Create a password" />
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-1">
-                <Button className="h-12 w-full px-6">Create account</Button>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-slate-400 transition hover:text-white"
-                >
-                  Already have an account? Sign in
-                </button>
-              </div>
-            </div>
-          </div>
+          <RegistrationPanel />
         </div>
       </section>
     </main>

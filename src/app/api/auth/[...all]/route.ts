@@ -1,14 +1,29 @@
+import { NextResponse } from "next/server";
 import { getAuth } from "@/lib/auth";
 import { toNextJsHandler } from "better-auth/next-js";
 
-export async function GET(request: Request) {
-  const { GET: handler } = toNextJsHandler(getAuth());
+function authErrorResponse(error: unknown) {
+  const message = error instanceof Error ? error.message : "Auth is not configured.";
 
-  return handler(request);
+  return NextResponse.json({ error: message }, { status: 500 });
+}
+
+export async function GET(request: Request) {
+  try {
+    const { GET: handler } = toNextJsHandler(getAuth());
+
+    return handler(request);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
 }
 
 export async function POST(request: Request) {
-  const { POST: handler } = toNextJsHandler(getAuth());
+  try {
+    const { POST: handler } = toNextJsHandler(getAuth());
 
-  return handler(request);
+    return handler(request);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
 }
