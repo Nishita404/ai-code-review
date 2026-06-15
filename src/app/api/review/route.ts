@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { zodResponseFormat } from "openai/helpers/zod";
-import { reviewRequestSchema, reviewResponseSchema } from "@/lib/review-schema";
+import { ApiError, GoogleGenAI } from "@google/genai";
+import { reviewRequestSchema, reviewResponseJsonSchema, reviewResponseSchema } from "@/lib/review-schema";
 
-const reviewModel = process.env.OPENAI_REVIEW_MODEL ?? "gpt-4o-mini";
+const reviewModel = "gemini-2.5-flash";
 
 function buildReviewPrompt(code: string, language: string) {
-  return `Review the following ${language} code. Return ONLY valid JSON matching the required schema.
+  return `Review the following ${language} code.
 
 Analyze:
 - bugs: logic errors, edge cases, null/undefined risks, incorrect behavior
@@ -19,12 +18,36 @@ Scoring:
 - score: integer from 0 to 100 reflecting overall code health
 - summary: one or two sentences summarizing the review
 
-For each issue include a clear title, severity, explanation, and a concrete fix.
+For each issue include a clear title, severity (low, medium, high, or critical), explanation, and a concrete fix.
+
+Return only valid JSON. Do not include markdown, code fences, or extra text.
 
 Code:
-\`\`\`${language}
-${code}
-\`\`\``;
+${code}`;
+}
+
+function parseReviewResponse(text: string) {
+  const withoutFences = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(withoutFences);
+  } catch {
+    return { success: false as const, error: "AI returned invalid review data" };
+  }
+
+  const validated = reviewResponseSchema.safeParse(parsed);
+
+  if (!validated.success) {
+    return { success: false as const, error: "AI returned invalid review data" };
+  }
+
+  return { success: true as const, data: validated.data };
 }
 
 export async function POST(request: Request) {
@@ -42,50 +65,51 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "OpenAI API key is not configured. Add OPENAI_API_KEY to .env.local." },
+        { error: "Gemini API key is not configured. Add GEMINI_API_KEY to .env.local." },
         { status: 500 },
       );
     }
 
-    const openai = new OpenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey });
     const { code, language } = parsedBody.data;
 
-    const completion = await openai.chat.completions.parse({
+    const response = await ai.models.generateContent({
       model: reviewModel,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert code reviewer. Respond with ONLY valid JSON that matches the provided schema. Do not include markdown fences or extra text.",
-        },
-        {
-          role: "user",
-          content: buildReviewPrompt(code, language),
-        },
-      ],
-      response_format: zodResponseFormat(reviewResponseSchema, "code_review"),
+      contents: buildReviewPrompt(code, language),
+      config: {
+        temperature: 0.2,
+        systemInstruction:
+          "You are an expert code reviewer. Respond with only valid JSON matching the required schema. Do not include markdown, code fences, or extra text.",
+        responseMimeType: "application/json",
+        responseJsonSchema: reviewResponseJsonSchema,
+      },
     });
 
-    const review = completion.choices[0]?.message?.parsed;
+    const text = response.text;
 
-    if (!review) {
+    if (!text) {
       return NextResponse.json({ error: "AI returned invalid review data" }, { status: 502 });
     }
 
-    return NextResponse.json(review);
+    const review = parseReviewResponse(text);
+
+    if (!review.success) {
+      return NextResponse.json({ error: review.error }, { status: 502 });
+    }
+
+    return NextResponse.json(review.data);
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
 
-    if (error instanceof OpenAI.APIError) {
+    if (error instanceof ApiError) {
       return NextResponse.json(
-        { error: error.message || "OpenAI request failed" },
+        { error: error.message || "Gemini request failed" },
         { status: error.status ?? 502 },
       );
     }

@@ -24,3 +24,5 @@ export const reviewResponseSchema = z.object({
 
 export type ReviewIssue = z.infer<typeof issueSchema>;
 export type ReviewResponse = z.infer<typeof reviewResponseSchema>;
+
+export const reviewResponseJsonSchema = z.toJSONSchema(reviewResponseSchema);
