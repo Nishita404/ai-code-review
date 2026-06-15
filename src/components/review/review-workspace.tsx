@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { detectLanguage, toMonacoLanguage, type LanguageName } from "@/lib/detect-language";
+import type { ReviewIssue, ReviewResponse } from "@/lib/review-schema";
 
 const languageOptions: LanguageName[] = [
   "Plain Text",
@@ -36,21 +37,6 @@ const starterCode = `const getUserDisplayName = (user) => {
 
 export default getUserDisplayName;`;
 
-type ReviewFinding = {
-  title: string;
-  severity: string;
-};
-
-type ReviewResponse = {
-  score: number;
-  summary: string;
-  bugs: ReviewFinding[];
-  security: ReviewFinding[];
-  performance: ReviewFinding[];
-  quality: ReviewFinding[];
-  suggestions: string[];
-};
-
 const emptyReviewState: ReviewResponse = {
   score: 0,
   summary: "Run a review to see structured feedback here.",
@@ -61,8 +47,9 @@ const emptyReviewState: ReviewResponse = {
   suggestions: [],
 };
 
-function getFindingTone(severity: string) {
-  switch (severity.toLowerCase()) {
+function getFindingTone(severity: ReviewIssue["severity"]) {
+  switch (severity) {
+    case "critical":
     case "high":
       return "text-rose-300";
     case "medium":
@@ -178,7 +165,7 @@ export function ReviewWorkspace() {
 
             <div className="flex flex-wrap gap-2 text-sm text-slate-400">
               <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">{lineCount} lines</span>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">Mock analysis</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">AI analysis</span>
             </div>
           </div>
 
@@ -326,12 +313,14 @@ export function ReviewWorkspace() {
                         <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{section.label}</p>
                         <div className="mt-3 space-y-3">
                           {section.items.length > 0 ? (
-                            section.items.map((item) => (
-                              <div key={item.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                            section.items.map((item, index) => (
+                              <div key={`${section.label}-${item.title}-${index}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                                 <div className="flex items-start justify-between gap-4">
                                   <p className="text-sm font-medium text-white">{item.title}</p>
                                   <span className={`text-xs uppercase tracking-[0.22em] ${getFindingTone(item.severity)}`}>{item.severity}</span>
                                 </div>
+                                {item.explanation ? <p className="mt-2 text-sm leading-6 text-slate-400">{item.explanation}</p> : null}
+                                {item.fix ? <p className="mt-2 text-sm leading-6 text-emerald-200/90">Fix: {item.fix}</p> : null}
                               </div>
                             ))
                           ) : (
