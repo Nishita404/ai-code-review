@@ -3,7 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useMemo, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { FileUp, RotateCcw, Sparkles } from "lucide-react";
+import { FileUp, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -36,18 +36,49 @@ const starterCode = `const getUserDisplayName = (user) => {
 
 export default getUserDisplayName;`;
 
-const summaryCards = [
-  { label: "Overall Score", value: "87/100", tone: "text-emerald-300" },
-  { label: "Bugs", value: "2 findings", tone: "text-sky-300" },
-  { label: "Security", value: "1 finding", tone: "text-amber-300" },
-  { label: "Performance", value: "3 notes", tone: "text-cyan-300" },
-  { label: "Code Quality", value: "4 suggestions", tone: "text-fuchsia-300" },
-];
+type ReviewFinding = {
+  title: string;
+  severity: string;
+};
+
+type ReviewResponse = {
+  score: number;
+  summary: string;
+  bugs: ReviewFinding[];
+  security: ReviewFinding[];
+  performance: ReviewFinding[];
+  quality: ReviewFinding[];
+  suggestions: string[];
+};
+
+const emptyReviewState: ReviewResponse = {
+  score: 0,
+  summary: "Run a review to see structured feedback here.",
+  bugs: [],
+  security: [],
+  performance: [],
+  quality: [],
+  suggestions: [],
+};
+
+function getFindingTone(severity: string) {
+  switch (severity.toLowerCase()) {
+    case "high":
+      return "text-rose-300";
+    case "medium":
+      return "text-amber-300";
+    default:
+      return "text-sky-300";
+  }
+}
 
 export function ReviewWorkspace() {
   const [code, setCode] = useState(starterCode);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageName>(() => detectLanguage(starterCode));
   const [isManualLanguage, setIsManualLanguage] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewResult, setReviewResult] = useState<ReviewResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const lineCount = useMemo(() => code.split("\n").length, [code]);
@@ -89,6 +120,39 @@ export function ReviewWorkspace() {
 
     reader.readAsText(file);
   }
+
+  async function handleReview() {
+    setIsReviewing(true);
+    setReviewError(null);
+
+    try {
+      const response = await fetch("/api/review", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code,
+          language: selectedLanguage,
+        }),
+      });
+
+      const data = (await response.json()) as ReviewResponse & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Review request failed");
+      }
+
+      setReviewResult(data);
+    } catch (error) {
+      setReviewResult(null);
+      setReviewError(error instanceof Error ? error.message : "Unable to run review");
+    } finally {
+      setIsReviewing(false);
+    }
+  }
+
+  const activeReview = reviewResult ?? emptyReviewState;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -200,9 +264,9 @@ export function ReviewWorkspace() {
 
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-400">Use the editor to prepare code for a future review request.</p>
-                  <Button className="h-12 px-6">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Review code
+                  <Button className="h-12 px-6" onClick={handleReview} disabled={isReviewing}>
+                    {isReviewing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Review
                   </Button>
                 </div>
               </CardContent>
@@ -216,43 +280,78 @@ export function ReviewWorkspace() {
                     <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Review results</h2>
                   </div>
                 </CardHeader>
-                <CardContent className="grid gap-3 px-0 pb-0 pt-0 sm:grid-cols-2">
-                  {summaryCards.map((card) => (
-                    <div key={card.label} className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{card.label}</p>
-                      <p className={`mt-3 text-2xl font-semibold tracking-tight ${card.tone}`}>{card.value}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl sm:p-5">
-                <CardHeader className="px-0 pt-0 pb-4">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.3em] text-slate-500">Summary</p>
-                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">AI review summary</h2>
-                  </div>
-                </CardHeader>
                 <CardContent className="grid gap-3 px-0 pb-0 pt-0">
-                  <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm font-medium text-white">Score</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">87/100 with a strong baseline and a few cleanup opportunities.</p>
+                  {reviewError ? (
+                    <div className="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">
+                      {reviewError}
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Overall Score</p>
+                      <p className="mt-3 text-2xl font-semibold tracking-tight text-emerald-300">
+                        {isReviewing ? (
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-400">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Reviewing...
+                          </span>
+                        ) : reviewResult ? (
+                          `${reviewResult.score}/100`
+                        ) : (
+                          "No review yet"
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-black/30 p-4 sm:col-span-1">
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Summary</p>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">{activeReview.summary}</p>
+                    </div>
                   </div>
-                  <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm font-medium text-white">Bugs</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">2 likely issues around null handling and fallback logic.</p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      { label: "Bugs", items: activeReview.bugs },
+                      { label: "Security", items: activeReview.security },
+                      { label: "Performance", items: activeReview.performance },
+                      { label: "Code Quality", items: activeReview.quality },
+                    ].map((section) => (
+                      <div key={section.label} className="rounded-3xl border border-white/10 bg-black/30 p-4">
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{section.label}</p>
+                        <div className="mt-3 space-y-3">
+                          {section.items.length > 0 ? (
+                            section.items.map((item) => (
+                              <div key={item.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                                <div className="flex items-start justify-between gap-4">
+                                  <p className="text-sm font-medium text-white">{item.title}</p>
+                                  <span className={`text-xs uppercase tracking-[0.22em] ${getFindingTone(item.severity)}`}>{item.severity}</span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm leading-6 text-slate-400">
+                              {isReviewing ? "Waiting for results..." : "No findings yet."}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
+
                   <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm font-medium text-white">Security</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">1 item to inspect for safer data access patterns.</p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm font-medium text-white">Performance</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">3 opportunities to simplify work and reduce repeated lookups.</p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-sm font-medium text-white">Code Quality</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">4 suggestions to improve consistency and readability.</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Suggestions</p>
+                    <div className="mt-3 space-y-3">
+                      {activeReview.suggestions.length > 0 ? (
+                        activeReview.suggestions.map((suggestion) => (
+                          <div key={suggestion} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm leading-6 text-slate-300">
+                            {suggestion}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm leading-6 text-slate-400">{isReviewing ? "Waiting for results..." : "No suggestions yet."}</p>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
