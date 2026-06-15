@@ -122,6 +122,11 @@ export function ReviewWorkspace() {
   }
 
   async function handleReview() {
+    if (!code.trim()) {
+      setReviewError("Code is required");
+      return;
+    }
+
     setIsReviewing(true);
     setReviewError(null);
 
@@ -263,8 +268,8 @@ export function ReviewWorkspace() {
                 </div>
 
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-400">Use the editor to prepare code for a future review request.</p>
-                  <Button className="h-12 px-6" onClick={handleReview} disabled={isReviewing}>
+                  <p className="text-sm text-slate-400">Submit your code to receive structured review feedback.</p>
+                  <Button className="h-12 px-6" onClick={handleReview} disabled={isReviewing || !code.trim()}>
                     {isReviewing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                     Review
                   </Button>
