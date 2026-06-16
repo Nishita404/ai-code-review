@@ -57,7 +57,7 @@ export function LandingSections() {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <ButtonLink href="/review" className="h-12 px-6">
+                <ButtonLink href="/auth/sign-up" className="h-12 px-6">
                   Start reviewing
                 </ButtonLink>
                 <ButtonLink href="#features" variant="secondary" className="h-12 px-6">

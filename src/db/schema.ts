@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer, jsonb } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -73,9 +73,29 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+export const review = pgTable(
+  "review",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    language: text("language").notNull(),
+    score: integer("score").notNull(),
+    summary: text("summary").notNull(),
+    reviewJson: jsonb("review_json").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("review_userId_idx").on(table.userId)],
+);
+
+// ─── Relations ───────────────────────────────────────────────────────────────
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  reviews: many(review),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -88,6 +108,13 @@ export const sessionRelations = relations(session, ({ one }) => ({
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const reviewRelations = relations(review, ({ one }) => ({
+  user: one(user, {
+    fields: [review.userId],
     references: [user.id],
   }),
 }));

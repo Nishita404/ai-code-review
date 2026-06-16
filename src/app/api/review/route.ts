@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { ApiError, GoogleGenAI } from "@google/genai";
 import { reviewRequestSchema, reviewResponseJsonSchema, reviewResponseSchema } from "@/lib/review-schema";
+import { getAuth } from "@/lib/auth";
+import { getDb } from "@/db";
+import { review } from "@/db/schema";
 
 const reviewModel = "gemini-2.5-flash";
 
@@ -50,6 +54,11 @@ function parseReviewResponse(text: string) {
   return { success: true as const, data: validated.data };
 }
 
+/** Generate a simple random ID (no external dep needed) */
+function generateId() {
+  return crypto.randomUUID();
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -95,13 +104,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "AI returned invalid review data" }, { status: 502 });
     }
 
-    const review = parseReviewResponse(text);
+    const reviewResult = parseReviewResponse(text);
 
-    if (!review.success) {
-      return NextResponse.json({ error: review.error }, { status: 502 });
+    if (!reviewResult.success) {
+      return NextResponse.json({ error: reviewResult.error }, { status: 502 });
     }
 
-    return NextResponse.json(review.data);
+    // ─── Persist review for signed-in users (best-effort, non-blocking) ───
+    try {
+      const reqHeaders = await headers();
+      const session = await getAuth().api.getSession({ headers: reqHeaders });
+
+      if (session?.user?.id) {
+        const db = getDb();
+        await db.insert(review).values({
+          id: generateId(),
+          userId: session.user.id,
+          code,
+          language,
+          score: reviewResult.data.score,
+          summary: reviewResult.data.summary,
+          reviewJson: reviewResult.data,
+        });
+      }
+    } catch {
+      // Never fail the response if persistence fails — just skip saving.
+    }
+
+    return NextResponse.json(reviewResult.data);
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
