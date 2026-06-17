@@ -3,16 +3,22 @@
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { FileUp, History, Loader2, PanelLeftClose, PanelLeftOpen, RotateCcw, Sparkles } from "lucide-react";
+import { FileUp, History, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
-import { detectLanguage, toMonacoLanguage, type LanguageName } from "@/lib/detect-language";
+import {
+  detectLanguage,
+  toMonacoLanguage,
+  type LanguageName,
+} from "@/lib/detect-language";
 import type { ReviewIssue, ReviewResponse } from "@/lib/review-schema";
 import { ReviewHistoryPanel, type SavedReview } from "./review-history-panel";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const languageOptions: LanguageName[] = [
   "Plain Text",
@@ -49,7 +55,9 @@ const emptyReviewState: ReviewResponse = {
   suggestions: [],
 };
 
-function getFindingTone(severity: ReviewIssue["severity"]) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function severityColor(severity: ReviewIssue["severity"]) {
   switch (severity) {
     case "critical":
     case "high":
@@ -61,37 +69,136 @@ function getFindingTone(severity: ReviewIssue["severity"]) {
   }
 }
 
+function severityDot(severity: ReviewIssue["severity"]) {
+  switch (severity) {
+    case "critical":
+    case "high":
+      return "bg-rose-400";
+    case "medium":
+      return "bg-amber-400";
+    default:
+      return "bg-sky-400";
+  }
+}
+
+function scoreAccent(score: number) {
+  if (score >= 80) return "text-emerald-400";
+  if (score >= 60) return "text-amber-400";
+  return "text-rose-400";
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function IssueCard({ item }: { item: ReviewIssue }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-black/30 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium leading-5 text-white">{item.title}</p>
+        <span
+          className={cn(
+            "mt-0.5 flex shrink-0 items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.2em]",
+            severityColor(item.severity),
+          )}
+        >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              severityDot(item.severity),
+            )}
+          />
+          {item.severity}
+        </span>
+      </div>
+      {item.explanation && (
+        <p className="mt-2 text-xs leading-5 text-slate-400">
+          {item.explanation}
+        </p>
+      )}
+      {item.fix && (
+        <p className="mt-2 text-xs leading-5 text-emerald-300/80">
+          <span className="font-semibold text-emerald-400">Fix: </span>
+          {item.fix}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function IssueSection({
+  label,
+  items,
+  isReviewing,
+}: {
+  label: string;
+  items: ReviewIssue[];
+  isReviewing: boolean;
+}) {
+  const count = items.length;
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500">
+          {label}
+        </p>
+        {count > 0 && (
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] tabular-nums text-slate-400">
+            {count}
+          </span>
+        )}
+      </div>
+      {count === 0 ? (
+        <p className="text-xs text-slate-600">
+          {isReviewing ? "Analysing…" : "No findings."}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item, i) => (
+            <IssueCard key={`${label}-${i}`} item={item} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function ReviewWorkspace() {
-  // ─── Editor state ─────────────────────────────────────────────────────────
+  // ── Editor state ──────────────────────────────────────────────────────────
   const [code, setCode] = useState(starterCode);
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageName>(() => detectLanguage(starterCode));
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageName>(() =>
+    detectLanguage(starterCode),
+  );
   const [isManualLanguage, setIsManualLanguage] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<ReviewResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ─── History state ─────────────────────────────────────────────────────────
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  // ── History state ──────────────────────────────────────────────────────────
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [savedReviews, setSavedReviews] = useState<SavedReview[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
 
-  // ─── Derived ──────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const lineCount = useMemo(() => code.split("\n").length, [code]);
   const detectedLanguage = useMemo(() => detectLanguage(code), [code]);
 
-  // ─── History fetch ────────────────────────────────────────────────────────
+  // ── History fetch ─────────────────────────────────────────────────────────
   async function fetchHistory() {
     try {
       const res = await fetch("/api/reviews");
       if (!res.ok) return;
-      const data = (await res.json()) as { reviews: SavedReview[]; signedIn: boolean };
+      const data = (await res.json()) as {
+        reviews: SavedReview[];
+        signedIn: boolean;
+      };
       setIsSignedIn(data.signedIn);
       setSavedReviews(data.reviews ?? []);
     } catch {
-      // silently ignore — history is non-critical
+      // non-critical — silently ignore
     } finally {
       setIsHistoryLoading(false);
     }
@@ -101,12 +208,10 @@ export function ReviewWorkspace() {
     fetchHistory();
   }, []);
 
-  // ─── Editor handlers ──────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
   function updateCode(nextCode: string) {
     setCode(nextCode);
-    if (!isManualLanguage) {
-      setSelectedLanguage(detectLanguage(nextCode));
-    }
+    if (!isManualLanguage) setSelectedLanguage(detectLanguage(nextCode));
   }
 
   function handleAutoDetect() {
@@ -126,13 +231,11 @@ export function ReviewWorkspace() {
     reader.readAsText(file);
   }
 
-  // ─── Review handler ───────────────────────────────────────────────────────
   async function handleReview() {
     if (!code.trim()) {
       setReviewError("Code is required");
       return;
     }
-
     setIsReviewing(true);
     setReviewError(null);
     setSelectedReviewId(null);
@@ -143,26 +246,22 @@ export function ReviewWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, language: selectedLanguage }),
       });
-
-      const data = (await response.json()) as ReviewResponse & { error?: string };
-
-      if (!response.ok) {
-        throw new Error(data.error ?? "Review request failed");
-      }
-
+      const data = (await response.json()) as ReviewResponse & {
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error ?? "Review request failed");
       setReviewResult(data);
-
-      // Refresh history so new review appears immediately
       fetchHistory();
     } catch (error) {
       setReviewResult(null);
-      setReviewError(error instanceof Error ? error.message : "Unable to run review");
+      setReviewError(
+        error instanceof Error ? error.message : "Unable to run review",
+      );
     } finally {
       setIsReviewing(false);
     }
   }
 
-  // ─── History restore ──────────────────────────────────────────────────────
   function handleRestoreReview(saved: SavedReview) {
     setCode(saved.code);
     setSelectedLanguage(saved.language as LanguageName);
@@ -176,279 +275,310 @@ export function ReviewWorkspace() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <section className="relative isolate overflow-hidden bg-black py-24 sm:py-28">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.04),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.03),transparent_22%)]" />
-        <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      {/* Subtle radial background */}
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.03),transparent_35%)]" />
 
-          {/* ── Page header ── */}
-          <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl space-y-4">
-              <Badge className="border-white/10 bg-white/5 text-slate-200">Review workspace</Badge>
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">AI Code Review Platform</p>
-                <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Paste code, review fast, stay focused.
-                </h1>
-                <p className="max-w-2xl text-lg leading-8 text-slate-300">
-                  A clean workspace for Monaco editing, language selection, file import, and structured review results.
-                </p>
-              </div>
-            </div>
+      {/* History drawer (overlay — does not affect layout) */}
+      <ReviewHistoryPanel
+        reviews={savedReviews}
+        isLoading={isHistoryLoading}
+        isSignedIn={isSignedIn}
+        isOpen={isHistoryOpen}
+        selectedId={selectedReviewId}
+        onClose={() => setIsHistoryOpen(false)}
+        onSelect={handleRestoreReview}
+      />
 
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">{lineCount} lines</span>
-              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">AI analysis</span>
-
-              {/* History toggle */}
-              <button
-                type="button"
-                onClick={() => setIsHistoryOpen((v) => !v)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200",
-                  isHistoryOpen
-                    ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15"
-                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-slate-200",
-                )}
-                title={isHistoryOpen ? "Hide history" : "Show history"}
-              >
-                {isHistoryOpen ? (
-                  <PanelLeftClose className="h-3.5 w-3.5" />
-                ) : (
-                  <PanelLeftOpen className="h-3.5 w-3.5" />
-                )}
-                <History className="h-3.5 w-3.5" />
-                History
-                {isSignedIn && savedReviews.length > 0 && (
-                  <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                    {savedReviews.length}
-                  </span>
-                )}
-              </button>
-            </div>
+      <div className="relative mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 lg:px-10">
+        {/* ── Page header ── */}
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Badge className="border-white/10 bg-white/5 text-slate-200">
+              Review workspace
+            </Badge>
+            <span className="hidden rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-500 sm:inline">
+              {lineCount} lines
+            </span>
           </div>
 
-          {/* ── Main body: history sidebar + editor/results ── */}
-          <div className={cn("flex gap-6", isHistoryOpen ? "lg:flex-row lg:items-start" : "flex-col")}>
+          <div className="flex items-center gap-2">
+            {/* History button */}
+            <button
+              type="button"
+              onClick={() => setIsHistoryOpen(true)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200",
+                isHistoryOpen
+                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-slate-200",
+              )}
+            >
+              <History className="h-3.5 w-3.5" />
+              History
+              {isSignedIn && savedReviews.length > 0 && (
+                <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                  {savedReviews.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
 
-            {/* History panel — left sidebar on desktop, stacked on mobile */}
-            {isHistoryOpen && (
-              <aside className="w-full lg:w-64 lg:shrink-0 lg:sticky lg:top-8">
-                <ReviewHistoryPanel
-                  reviews={savedReviews}
-                  isLoading={isHistoryLoading}
-                  isSignedIn={isSignedIn}
-                  selectedId={selectedReviewId}
-                  onSelect={handleRestoreReview}
-                />
-              </aside>
-            )}
+        {/* ── Two-column grid: editor (wider) | results ── */}
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[3fr_2fr]">
+          {/* ── Editor panel ── */}
+          <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
+            <CardHeader className="px-5 pb-4 pt-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">
+                    Editor
+                  </p>
+                  <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-white">
+                    Source input
+                  </h2>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-400">
+                  Monaco
+                </span>
+              </div>
+            </CardHeader>
 
-            {/* Editor + results grid */}
-            <div className="min-w-0 flex-1 grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-
-              {/* ── Editor card ── */}
-              <Card className="border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl sm:p-5">
-                <CardHeader className="px-0 pt-0 pb-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-[0.3em] text-slate-500">Editor</p>
-                      <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Source review input</h2>
-                    </div>
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-300">
-                      Monaco Editor
-                    </span>
+            <CardContent className="px-5 pb-5">
+              {/* Controls row */}
+              <div className="flex flex-wrap items-end gap-3">
+                {/* Language selector */}
+                <div
+                  className="flex min-w-0 flex-1 flex-col gap-1.5"
+                  style={{ minWidth: "160px" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="language">Language</Label>
+                    <button
+                      type="button"
+                      onClick={handleAutoDetect}
+                      className="text-[11px] text-slate-500 transition hover:text-slate-300"
+                    >
+                      Auto detect
+                    </button>
                   </div>
-                </CardHeader>
-
-                <CardContent className="px-0 pb-0 pt-0">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2 sm:col-span-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label htmlFor="language">Language</Label>
-                        <Button variant="ghost" type="button" className="h-8 px-3 text-xs" onClick={handleAutoDetect}>
-                          Auto detect
-                        </Button>
-                      </div>
-                      <Select
-                        id="language"
-                        value={selectedLanguage}
-                        onChange={(event) => {
-                          setSelectedLanguage(event.target.value as LanguageName);
-                          setIsManualLanguage(true);
-                        }}
+                  <Select
+                    id="language"
+                    value={selectedLanguage}
+                    onChange={(e) => {
+                      setSelectedLanguage(e.target.value as LanguageName);
+                      setIsManualLanguage(true);
+                    }}
+                  >
+                    {languageOptions.map((opt) => (
+                      <option
+                        key={opt}
+                        value={opt}
+                        className="bg-black text-white"
                       >
-                        {languageOptions.map((option) => (
-                          <option key={option} value={option} className="bg-black text-white">
-                            {option}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
+                        {opt}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
 
-                    <div className="flex items-end gap-3 sm:justify-end">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".ts,.tsx,.js,.jsx,.py,.java,.go,.rs,.cs,.sql,.txt"
-                        className="hidden"
-                        onChange={handleFileSelect}
-                      />
-                      <Button variant="secondary" type="button" className="h-12 px-4" onClick={() => fileInputRef.current?.click()}>
-                        <FileUp className="mr-2 h-4 w-4" />
-                        Upload file
-                      </Button>
-                      <Button variant="ghost" type="button" className="h-12 px-4" onClick={handleClear}>
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-[#030303] p-1 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-                    <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3 text-xs text-slate-400">
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
-                        Detected: {detectedLanguage}
-                      </span>
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-slate-300">
-                        Editor: {selectedLanguage}
-                      </span>
-                      {isManualLanguage ? (
-                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-emerald-200">
-                          Manual override
-                        </span>
-                      ) : null}
-                      {selectedReviewId ? (
-                        <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-1 text-sky-200">
-                          Restored from history
-                        </span>
-                      ) : null}
-                    </div>
-                    <Editor
-                      height="520px"
-                      defaultLanguage="typescript"
-                      language={toMonacoLanguage(selectedLanguage)}
-                      value={code}
-                      onChange={(value) => updateCode(value ?? "")}
-                      theme="vs-dark"
-                      options={{
-                        fontSize: 14,
-                        minimap: { enabled: false },
-                        padding: { top: 16, bottom: 16 },
-                        scrollBeyondLastLine: false,
-                        wordWrap: "on",
-                        automaticLayout: true,
-                        smoothScrolling: true,
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-slate-400">Submit your code to receive structured review feedback.</p>
-                    <Button className="h-12 px-6" onClick={handleReview} disabled={isReviewing || !code.trim()}>
-                      {isReviewing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                      Review
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* ── Results panel ── */}
-              <div className="space-y-6">
-                <Card className="border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl sm:p-5">
-                  <CardHeader className="px-0 pt-0 pb-4">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-[0.3em] text-slate-500">Results</p>
-                      <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Review results</h2>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 px-0 pb-0 pt-0">
-                    {reviewError ? (
-                      <div className="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">
-                        {reviewError}
-                      </div>
-                    ) : null}
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Overall Score</p>
-                        <p className="mt-3 text-2xl font-semibold tracking-tight text-emerald-300">
-                          {isReviewing ? (
-                            <span className="inline-flex items-center gap-2 text-sm text-slate-400">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Reviewing...
-                            </span>
-                          ) : reviewResult ? (
-                            `${reviewResult.score}/100`
-                          ) : (
-                            "No review yet"
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="rounded-3xl border border-white/10 bg-black/30 p-4 sm:col-span-1">
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Summary</p>
-                        <p className="mt-3 text-sm leading-6 text-slate-300">{activeReview.summary}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {[
-                        { label: "Bugs", items: activeReview.bugs },
-                        { label: "Security", items: activeReview.security },
-                        { label: "Performance", items: activeReview.performance },
-                        { label: "Code Quality", items: activeReview.quality },
-                      ].map((section) => (
-                        <div key={section.label} className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{section.label}</p>
-                          <div className="mt-3 space-y-3">
-                            {section.items.length > 0 ? (
-                              section.items.map((item, index) => (
-                                <div key={`${section.label}-${item.title}-${index}`} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-sm font-medium text-white">{item.title}</p>
-                                    <span className={`text-xs uppercase tracking-[0.22em] ${getFindingTone(item.severity)}`}>
-                                      {item.severity}
-                                    </span>
-                                  </div>
-                                  {item.explanation ? <p className="mt-2 text-sm leading-6 text-slate-400">{item.explanation}</p> : null}
-                                  {item.fix ? <p className="mt-2 text-sm leading-6 text-emerald-200/90">Fix: {item.fix}</p> : null}
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm leading-6 text-slate-400">
-                                {isReviewing ? "Waiting for results..." : "No findings yet."}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rounded-3xl border border-white/10 bg-black/30 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Suggestions</p>
-                      <div className="mt-3 space-y-3">
-                        {activeReview.suggestions.length > 0 ? (
-                          activeReview.suggestions.map((suggestion) => (
-                            <div key={suggestion} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm leading-6 text-slate-300">
-                              {suggestion}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm leading-6 text-slate-400">
-                            {isReviewing ? "Waiting for results..." : "No suggestions yet."}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Action buttons */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".ts,.tsx,.js,.jsx,.py,.java,.go,.rs,.cs,.sql,.txt"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    className="h-10 px-3 text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FileUp className="mr-1.5 h-3.5 w-3.5" />
+                    Upload
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    className="h-10 px-3 text-xs"
+                    onClick={handleClear}
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Clear
+                  </Button>
+                </div>
               </div>
 
-            </div>{/* end editor+results grid */}
-          </div>{/* end main body flex */}
+              {/* Monaco wrapper */}
+              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-[#030303]">
+                {/* Editor status bar */}
+                <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.07] px-4 py-2">
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-slate-400">
+                    {detectedLanguage}
+                  </span>
+                  {isManualLanguage && (
+                    <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-300">
+                      Manual
+                    </span>
+                  )}
+                  {selectedReviewId && (
+                    <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] text-sky-300">
+                      From history
+                    </span>
+                  )}
+                </div>
+                <Editor
+                  height="560px"
+                  defaultLanguage="typescript"
+                  language={toMonacoLanguage(selectedLanguage)}
+                  value={code}
+                  onChange={(value) => updateCode(value ?? "")}
+                  theme="vs-dark"
+                  options={{
+                    fontSize: 13,
+                    lineHeight: 22,
+                    minimap: { enabled: false },
+                    padding: { top: 14, bottom: 14 },
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    automaticLayout: true,
+                    smoothScrolling: true,
+                    renderLineHighlight: "gutter",
+                    scrollbar: {
+                      verticalScrollbarSize: 6,
+                      horizontalScrollbarSize: 6,
+                    },
+                  }}
+                />
+              </div>
 
+              {/* Submit row */}
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <p className="text-xs text-slate-500">
+                  Submit code to receive structured AI feedback.
+                </p>
+                <Button
+                  className="h-10 shrink-0 px-5 text-sm"
+                  onClick={handleReview}
+                  disabled={isReviewing || !code.trim()}
+                >
+                  {isReviewing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {isReviewing ? "Reviewing…" : "Review"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Results panel ── */}
+          <div className="flex flex-col gap-4">
+            {/* Score + summary card */}
+            <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
+              <CardHeader className="px-5 pb-3 pt-5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">
+                  Results
+                </p>
+              </CardHeader>
+              <CardContent className="px-5 pb-5">
+                {/* Error banner */}
+                {reviewError && (
+                  <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+                    {reviewError}
+                  </div>
+                )}
+
+                {/* Score */}
+                <div className="mb-4 flex items-baseline gap-2">
+                  <span
+                    className={cn(
+                      "text-5xl font-bold tabular-nums tracking-tight",
+                      reviewResult
+                        ? scoreAccent(reviewResult.score)
+                        : "text-slate-700",
+                    )}
+                  >
+                    {isReviewing ? (
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
+                    ) : reviewResult ? (
+                      reviewResult.score
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                  {reviewResult && !isReviewing && (
+                    <span className="text-sm text-slate-500">/ 100</span>
+                  )}
+                </div>
+
+                {/* Summary */}
+                <p className="text-sm leading-6 text-slate-400">
+                  {activeReview.summary}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Findings card — scrollable */}
+            <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
+              <CardHeader className="px-5 pb-3 pt-5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">
+                  Findings
+                </p>
+              </CardHeader>
+              <CardContent className="px-5 pb-5">
+                <div className="max-h-[560px] space-y-6 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.08)_transparent] [scrollbar-width:thin]">
+                  <IssueSection
+                    label="Bugs"
+                    items={activeReview.bugs}
+                    isReviewing={isReviewing}
+                  />
+                  <IssueSection
+                    label="Security"
+                    items={activeReview.security}
+                    isReviewing={isReviewing}
+                  />
+                  <IssueSection
+                    label="Performance"
+                    items={activeReview.performance}
+                    isReviewing={isReviewing}
+                  />
+                  <IssueSection
+                    label="Code Quality"
+                    items={activeReview.quality}
+                    isReviewing={isReviewing}
+                  />
+
+                  {/* Suggestions */}
+                  {activeReview.suggestions.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500">
+                        Suggestions
+                      </p>
+                      <div className="space-y-2">
+                        {activeReview.suggestions.map((s, i) => (
+                          <div
+                            key={i}
+                            className="rounded-2xl border border-white/[0.08] bg-black/30 px-4 py-3 text-xs leading-5 text-slate-300"
+                          >
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          {/* end results column */}
         </div>
-      </section>
+        {/* end two-column grid */}
+      </div>
     </main>
   );
 }
