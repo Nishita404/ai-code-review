@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
-import { ArrowLeft, Code2, LogIn, TrendingUp } from "lucide-react";
+import { ArrowLeft, Code2, TrendingUp } from "lucide-react";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/db";
 import { review } from "@/db/schema";
@@ -48,32 +49,24 @@ export default async function DashboardPage() {
     .api.getSession({ headers: reqHeaders })
     .catch(() => null);
 
-  const isSignedIn = !!session?.user?.id;
+  if (!session?.user?.id) {
+    redirect("/auth/sign-in?next=/dashboard");
+  }
 
   // ── Fetch reviews from DB ──
-  let reviews: {
-    id: string;
-    language: string;
-    score: number;
-    summary: string;
-    createdAt: Date;
-  }[] = [];
-
-  if (isSignedIn) {
-    const db = getDb();
-    reviews = await db
-      .select({
-        id: review.id,
-        language: review.language,
-        score: review.score,
-        summary: review.summary,
-        createdAt: review.createdAt,
-      })
-      .from(review)
-      .where(eq(review.userId, session!.user.id))
-      .orderBy(desc(review.createdAt))
-      .limit(50);
-  }
+  const db = getDb();
+  const reviews = await db
+    .select({
+      id: review.id,
+      language: review.language,
+      score: review.score,
+      summary: review.summary,
+      createdAt: review.createdAt,
+    })
+    .from(review)
+    .where(eq(review.userId, session.user.id))
+    .orderBy(desc(review.createdAt))
+    .limit(50);
 
   // ── Derived stats ──
   const avgScore =
@@ -128,105 +121,72 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Not signed in ── */}
-        {!isSignedIn && (
-          <div className="flex flex-col items-center gap-5 rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-              <LogIn className="h-7 w-7 text-slate-500" />
+        {/* ── Content ── */}
+        <div className="space-y-8">
+          {/* Stats row */}
+          {reviews.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatCard
+                label="Total reviews"
+                value={String(reviews.length)}
+                sub="saved to your account"
+              />
+              <StatCard
+                label="Average score"
+                value={avgScore !== null ? `${avgScore}/100` : "—"}
+                sub="across all reviews"
+              />
+              <StatCard
+                label="Top language"
+                value={topLanguage ?? "—"}
+                sub="most reviewed"
+              />
             </div>
-            <div className="space-y-2">
-              <p className="text-lg font-medium text-white">
-                Sign in to view your dashboard
-              </p>
-              <p className="text-sm text-slate-400">
-                Your review history is saved per account.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <ButtonLink href="/auth/sign-in" className="h-10 px-5 text-sm">
-                Sign in
-              </ButtonLink>
-              <ButtonLink
-                href="/auth/sign-up"
-                variant="secondary"
-                className="h-10 px-5 text-sm"
-              >
-                Create account
-              </ButtonLink>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* ── Signed in ── */}
-        {isSignedIn && (
-          <div className="space-y-8">
-            {/* Stats row */}
-            {reviews.length > 0 && (
-              <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                  label="Total reviews"
-                  value={String(reviews.length)}
-                  sub="saved to your account"
-                />
-                <StatCard
-                  label="Average score"
-                  value={avgScore !== null ? `${avgScore}/100` : "—"}
-                  sub="across all reviews"
-                />
-                <StatCard
-                  label="Top language"
-                  value={topLanguage ?? "—"}
-                  sub="most reviewed"
-                />
+          {/* Empty state */}
+          {reviews.length === 0 && (
+            <div className="flex flex-col items-center gap-5 rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
+                <Code2 className="h-7 w-7 text-slate-500" />
               </div>
-            )}
-
-            {/* Empty state */}
-            {reviews.length === 0 && (
-              <div className="flex flex-col items-center gap-5 rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-                  <Code2 className="h-7 w-7 text-slate-500" />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-lg font-medium text-white">
-                    No reviews yet
-                  </p>
-                  <p className="text-sm text-slate-400">
-                    Head to the workspace, paste some code, and run your first
-                    review.
-                  </p>
-                </div>
-                <ButtonLink href="/review" className="h-10 px-5 text-sm">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Start reviewing
-                </ButtonLink>
-              </div>
-            )}
-
-            {/* Review list */}
-            {reviews.length > 0 && (
-              <div>
-                <p className="mb-4 text-xs font-medium uppercase tracking-[0.3em] text-slate-500">
-                  Recent reviews — {reviews.length} saved
+              <div className="space-y-2">
+                <p className="text-lg font-medium text-white">No reviews yet</p>
+                <p className="text-sm text-slate-400">
+                  Head to the workspace, paste some code, and run your first
+                  review.
                 </p>
-                <div className="overflow-hidden rounded-3xl border border-white/10">
-                  {reviews.map((r, i) => (
-                    <ReviewRow
-                      key={r.id}
-                      id={r.id}
-                      language={r.language}
-                      score={r.score}
-                      summary={r.summary}
-                      createdAt={r.createdAt.toISOString()}
-                      scoreColor={scoreColor(r.score)}
-                      isLast={i === reviews.length - 1}
-                    />
-                  ))}
-                </div>
               </div>
-            )}
-          </div>
-        )}
+              <ButtonLink href="/review" className="h-10 px-5 text-sm">
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Start reviewing
+              </ButtonLink>
+            </div>
+          )}
+
+          {/* Review list */}
+          {reviews.length > 0 && (
+            <div>
+              <p className="mb-4 text-xs font-medium uppercase tracking-[0.3em] text-slate-500">
+                Recent reviews — {reviews.length} saved
+              </p>
+              <div className="overflow-hidden rounded-3xl border border-white/10">
+                {reviews.map((r, i) => (
+                  <ReviewRow
+                    key={r.id}
+                    id={r.id}
+                    language={r.language}
+                    score={r.score}
+                    summary={r.summary}
+                    createdAt={r.createdAt.toISOString()}
+                    scoreColor={scoreColor(r.score)}
+                    isLast={i === reviews.length - 1}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
