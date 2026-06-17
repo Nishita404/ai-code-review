@@ -2,21 +2,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
-import { ArrowLeft, Code2, TrendingUp } from "lucide-react";
+import { ArrowLeft, Code2, TrendingUp, Plus } from "lucide-react";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/db";
 import { review } from "@/db/schema";
-import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
-import { ReviewRow } from "@/components/dashboard/review-row";
+import { ReviewsTable } from "@/components/dashboard/reviews-table";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function scoreColor(score: number) {
-  if (score >= 80) return "text-emerald-400";
-  if (score >= 60) return "text-amber-400";
-  return "text-rose-400";
-}
 
 function StatCard({
   label,
@@ -29,13 +21,13 @@ function StatCard({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4">
-      <p className="text-xs font-medium uppercase tracking-[0.28em] text-slate-500">
+      <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500">
         {label}
       </p>
       <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
         {value}
       </p>
-      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+      {sub && <p className="mt-1 text-xs text-slate-600">{sub}</p>}
     </div>
   );
 }
@@ -43,7 +35,6 @@ function StatCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  // ── Auth check (server-side) ──
   const reqHeaders = await headers();
   const session = await getAuth()
     .api.getSession({ headers: reqHeaders })
@@ -53,7 +44,6 @@ export default async function DashboardPage() {
     redirect("/auth/sign-in?next=/dashboard");
   }
 
-  // ── Fetch reviews from DB ──
   const db = getDb();
   const reviews = await db
     .select({
@@ -66,69 +56,89 @@ export default async function DashboardPage() {
     .from(review)
     .where(eq(review.userId, session.user.id))
     .orderBy(desc(review.createdAt))
-    .limit(50);
+    .limit(200);
 
-  // ── Derived stats ──
+  // ── Stats ──
+  const total = reviews.length;
   const avgScore =
-    reviews.length > 0
-      ? Math.round(
-          reviews.reduce((sum, r) => sum + r.score, 0) / reviews.length,
-        )
+    total > 0
+      ? Math.round(reviews.reduce((s, r) => s + r.score, 0) / total)
       : null;
 
   const topLanguage = (() => {
-    if (reviews.length === 0) return null;
+    if (total === 0) return null;
     const counts: Record<string, number> = {};
     for (const r of reviews) counts[r.language] = (counts[r.language] ?? 0) + 1;
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   })();
 
+  // Serialise dates to ISO strings for the client component
+  const serialised = reviews.map((r) => ({
+    ...r,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
   return (
     <main className="min-h-screen bg-black text-white">
-      {/* Background */}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.03),transparent_40%)]" />
 
-      <div className="relative mx-auto w-full max-w-5xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         {/* ── Header ── */}
-        <div className="mb-12">
+        <div className="mb-10">
           <Link
             href="/review"
-            className="mb-6 inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-200"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-300"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to workspace
           </Link>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="space-y-3">
-              <Badge className="border-white/10 bg-white/5 text-slate-200">
-                Review history
-              </Badge>
-              <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500">
+                Review management
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 Dashboard
               </h1>
-              <p className="text-base leading-7 text-slate-400">
-                Your saved code reviews, scores, and findings in one place.
-              </p>
             </div>
-
-            <ButtonLink
+            <Link
               href="/review"
-              className="h-11 self-start px-5 sm:self-auto"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-medium text-white transition hover:border-white/25 hover:bg-white/10"
             >
+              <Plus className="h-4 w-4" />
               New review
-            </ButtonLink>
+            </Link>
           </div>
         </div>
 
-        {/* ── Content ── */}
-        <div className="space-y-8">
-          {/* Stats row */}
-          {reviews.length > 0 && (
+        {total === 0 ? (
+          /* ── Empty state ── */
+          <div className="flex flex-col items-center gap-5 rounded-3xl border border-white/10 bg-white/[0.02] py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03]">
+              <Code2 className="h-7 w-7 text-slate-600" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-base font-medium text-white">No reviews yet</p>
+              <p className="text-sm text-slate-500">
+                Head to the workspace and run your first review.
+              </p>
+            </div>
+            <Link
+              href="/review"
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-black transition hover:bg-slate-200"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Start reviewing
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* ── Stats ── */}
             <div className="grid gap-4 sm:grid-cols-3">
               <StatCard
                 label="Total reviews"
-                value={String(reviews.length)}
+                value={String(total)}
                 sub="saved to your account"
               />
               <StatCard
@@ -142,51 +152,16 @@ export default async function DashboardPage() {
                 sub="most reviewed"
               />
             </div>
-          )}
 
-          {/* Empty state */}
-          {reviews.length === 0 && (
-            <div className="flex flex-col items-center gap-5 rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-                <Code2 className="h-7 w-7 text-slate-500" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-lg font-medium text-white">No reviews yet</p>
-                <p className="text-sm text-slate-400">
-                  Head to the workspace, paste some code, and run your first
-                  review.
-                </p>
-              </div>
-              <ButtonLink href="/review" className="h-10 px-5 text-sm">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Start reviewing
-              </ButtonLink>
-            </div>
-          )}
-
-          {/* Review list */}
-          {reviews.length > 0 && (
+            {/* ── Review table ── */}
             <div>
-              <p className="mb-4 text-xs font-medium uppercase tracking-[0.3em] text-slate-500">
-                Recent reviews — {reviews.length} saved
+              <p className="mb-4 text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500">
+                All reviews
               </p>
-              <div className="overflow-hidden rounded-3xl border border-white/10">
-                {reviews.map((r, i) => (
-                  <ReviewRow
-                    key={r.id}
-                    id={r.id}
-                    language={r.language}
-                    score={r.score}
-                    summary={r.summary}
-                    createdAt={r.createdAt.toISOString()}
-                    scoreColor={scoreColor(r.score)}
-                    isLast={i === reviews.length - 1}
-                  />
-                ))}
-              </div>
+              <ReviewsTable initialReviews={serialised} />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </main>
   );
