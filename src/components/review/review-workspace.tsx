@@ -3,7 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { FileUp, History, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { FileUp, History, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import {
   detectLanguage,
+  detectLanguageFromFilename,
   toMonacoLanguage,
   type LanguageName,
 } from "@/lib/detect-language";
@@ -174,6 +175,10 @@ export function ReviewWorkspace() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<ReviewResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{
+    name: string;
+    size: number;
+  } | null>(null);
 
   // ── History state ──────────────────────────────────────────────────────────
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -221,13 +226,32 @@ export function ReviewWorkspace() {
 
   function handleClear() {
     updateCode("");
+    setUploadedFile(null);
+    // Reset the input so the same file can be re-uploaded
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Reset value immediately so re-selecting the same file triggers onChange again
+    event.target.value = "";
+
     const reader = new FileReader();
-    reader.onload = () => updateCode(String(reader.result ?? ""));
+    reader.onload = () => {
+      const content = String(reader.result ?? "");
+      setCode(content);
+
+      // Filename extension is the primary signal; fall back to content heuristics
+      const fromFilename = detectLanguageFromFilename(file.name);
+      const lang = fromFilename ?? detectLanguage(content);
+      setSelectedLanguage(lang);
+      setIsManualLanguage(true);
+
+      setUploadedFile({ name: file.name, size: file.size });
+      setReviewError(null);
+    };
     reader.readAsText(file);
   }
 
@@ -387,7 +411,7 @@ export function ReviewWorkspace() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".ts,.tsx,.js,.jsx,.py,.java,.go,.rs,.cs,.sql,.txt"
+                    accept=".ts,.tsx,.mts,.cts,.js,.jsx,.mjs,.cjs,.py,.pyw,.pyi,.java,.c,.h,.cpp,.cxx,.cc,.hpp,.hxx,.go,.rs,.html,.htm,.css,.scss,.sass,.less,.sql,.sh,.bash,.zsh,.json,.jsonc,.txt,.md"
                     className="hidden"
                     onChange={handleFileSelect}
                   />
@@ -398,7 +422,7 @@ export function ReviewWorkspace() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <FileUp className="mr-1.5 h-3.5 w-3.5" />
-                    Upload
+                    Upload file
                   </Button>
                   <Button
                     variant="ghost"
@@ -412,14 +436,37 @@ export function ReviewWorkspace() {
                 </div>
               </div>
 
+              {/* Uploaded file badge */}
+              {uploadedFile && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-2">
+                  <FileUp className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-emerald-300">
+                    {uploadedFile.name}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-emerald-500">
+                    {uploadedFile.size < 1024
+                      ? `${uploadedFile.size} B`
+                      : `${(uploadedFile.size / 1024).toFixed(1)} KB`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="ml-1 shrink-0 rounded p-0.5 text-emerald-500 transition hover:text-emerald-200"
+                    aria-label="Remove uploaded file"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
               {/* Monaco wrapper */}
-              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-[#030303]">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-[#030303]">
                 {/* Editor status bar */}
                 <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.07] px-4 py-2">
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-slate-400">
                     {detectedLanguage}
                   </span>
-                  {isManualLanguage && (
+                  {isManualLanguage && !uploadedFile && (
                     <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-300">
                       Manual
                     </span>
