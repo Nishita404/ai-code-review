@@ -51,6 +51,8 @@ export default async function DashboardPage() {
       language: review.language,
       score: review.score,
       summary: review.summary,
+      starred: review.starred,
+      tags: review.tags,
       createdAt: review.createdAt,
     })
     .from(review)

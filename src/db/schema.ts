@@ -1,5 +1,13 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  integer,
+  jsonb,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -85,6 +93,8 @@ export const review = pgTable(
     score: integer("score").notNull(),
     summary: text("summary").notNull(),
     reviewJson: jsonb("review_json").notNull(),
+    starred: boolean("starred").default(false).notNull(),
+    tags: text("tags").array().default([]).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("review_userId_idx").on(table.userId)],

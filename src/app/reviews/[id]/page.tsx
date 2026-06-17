@@ -8,6 +8,7 @@ import { getDb } from "@/db";
 import { review } from "@/db/schema";
 import type { ReviewResponse, ReviewIssue } from "@/lib/review-schema";
 import { cn } from "@/lib/cn";
+import { ReviewOrganizer } from "@/components/dashboard/review-organizer";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,13 @@ function IssueCard({ item }: { item: ReviewIssue }) {
   );
 }
 
-function IssueSection({ label, items }: { label: string; items: ReviewIssue[] }) {
+function IssueSection({
+  label,
+  items,
+}: {
+  label: string;
+  items: ReviewIssue[];
+}) {
   return (
     <div>
       <SectionHeading>{label}</SectionHeading>
@@ -142,7 +149,6 @@ export default async function ReviewDetailPage({
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.03),transparent_40%)]" />
 
       <div className="relative mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-
         {/* Back */}
         <Link
           href="/dashboard"
@@ -172,6 +178,15 @@ export default async function ReviewDetailPage({
             <Calendar className="h-3.5 w-3.5" />
             {formatDate(row.createdAt)}
           </div>
+        </div>
+
+        {/* ── Organizer (star + tags) ── */}
+        <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-5">
+          <ReviewOrganizer
+            reviewId={row.id}
+            initialStarred={row.starred}
+            initialTags={row.tags ?? []}
+          />
         </div>
 
         {/* ── Summary ── */}
@@ -243,7 +258,6 @@ export default async function ReviewDetailPage({
             </pre>
           </div>
         </div>
-
       </div>
     </main>
   );
