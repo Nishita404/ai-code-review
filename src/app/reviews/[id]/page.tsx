@@ -9,6 +9,7 @@ import { review } from "@/db/schema";
 import type { ReviewResponse, ReviewIssue } from "@/lib/review-schema";
 import { cn } from "@/lib/cn";
 import { ReviewOrganizer } from "@/components/dashboard/review-organizer";
+import { ReviewDetailFixSection } from "@/components/review/review-detail-fix-section";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -258,6 +259,13 @@ export default async function ReviewDetailPage({
             </pre>
           </div>
         </div>
+
+        {/* ── AI Fix Generator ── */}
+        <ReviewDetailFixSection
+          code={row.code}
+          language={row.language}
+          review={rj}
+        />
       </div>
     </main>
   );

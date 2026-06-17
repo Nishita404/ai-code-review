@@ -18,6 +18,7 @@ import {
 } from "@/lib/detect-language";
 import type { ReviewIssue, ReviewResponse } from "@/lib/review-schema";
 import { ReviewHistoryPanel, type SavedReview } from "./review-history-panel";
+import { FixPanel } from "./fix-panel";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -625,6 +626,17 @@ export function ReviewWorkspace() {
           {/* end results column */}
         </div>
         {/* end two-column grid */}
+
+        {/* ── Fix Generator ── */}
+        {reviewResult && (
+          <div className="mt-6">
+            <FixPanel
+              code={code}
+              language={selectedLanguage}
+              review={reviewResult}
+            />
+          </div>
+        )}
       </div>
     </main>
   );
