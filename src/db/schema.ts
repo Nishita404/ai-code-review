@@ -154,14 +154,65 @@ export const repoAnalysis = pgTable(
   (table) => [index("repo_analysis_userId_idx").on(table.userId)],
 );
 
+export const githubAccounts = pgTable(
+  "github_accounts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    githubId: text("github_id").notNull().unique(),
+    username: text("username").notNull(),
+    avatar: text("avatar"),
+    encryptedAccessToken: text("encrypted_access_token").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("github_accounts_userId_idx").on(table.userId),
+    index("github_accounts_githubId_idx").on(table.githubId),
+  ],
+);
+
+export const githubRepositories = pgTable(
+  "github_repositories",
+  {
+    id: text("id").primaryKey(),
+    githubAccountId: text("github_account_id")
+      .notNull()
+      .references(() => githubAccounts.id, { onDelete: "cascade" }),
+    repoId: text("repo_id").notNull(),
+    name: text("name").notNull(),
+    fullName: text("full_name").notNull(),
+    isPrivate: boolean("is_private").notNull(),
+    htmlUrl: text("html_url").notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("github_repositories_githubAccountId_idx").on(table.githubAccountId),
+  ],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
-export const userRelations = relations(user, ({ many }) => ({
+export const userRelations = relations(user, ({ one, many }) => ({
   sessions: many(session),
   accounts: many(account),
   reviews: many(review),
   reviewProjects: many(reviewProject),
   repoAnalyses: many(repoAnalysis),
+  githubAccount: one(githubAccounts, {
+    fields: [user.id],
+    references: [githubAccounts.userId],
+  }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -204,5 +255,20 @@ export const repoAnalysisRelations = relations(repoAnalysis, ({ one }) => ({
   user: one(user, {
     fields: [repoAnalysis.userId],
     references: [user.id],
+  }),
+}));
+
+export const githubAccountsRelations = relations(githubAccounts, ({ one, many }) => ({
+  user: one(user, {
+    fields: [githubAccounts.userId],
+    references: [user.id],
+  }),
+  repositories: many(githubRepositories),
+}));
+
+export const githubRepositoriesRelations = relations(githubRepositories, ({ one }) => ({
+  githubAccount: one(githubAccounts, {
+    fields: [githubRepositories.githubAccountId],
+    references: [githubAccounts.id],
   }),
 }));

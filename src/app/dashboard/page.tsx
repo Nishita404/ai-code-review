@@ -19,6 +19,7 @@ import { review } from "@/db/schema";
 import type { ReviewResponse } from "@/lib/review-schema";
 import { ReviewsTable } from "@/components/dashboard/reviews-table";
 import { TrendChart } from "@/components/dashboard/trend-chart";
+import { GithubConnectCard } from "@/components/review/github-connect-card";
 import type { TrendPoint } from "@/components/dashboard/trend-chart";
 import { LanguageChart } from "@/components/dashboard/language-chart";
 import type { LanguagePoint } from "@/components/dashboard/language-chart";
@@ -393,6 +394,12 @@ export default async function DashboardPage() {
                 accent="text-violet-400"
               />
             </div>
+          </section>
+
+          {/* ── Integrations ── */}
+          <section>
+            <SectionLabel>Integrations</SectionLabel>
+            <GithubConnectCard />
           </section>
 
           {/* ── Charts row 1: trend + findings ── */}
