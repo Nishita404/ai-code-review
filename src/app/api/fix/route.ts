@@ -126,8 +126,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
     }
     if (error instanceof ApiError) {
+      if (error.status === 429) {
+        return NextResponse.json(
+          { error: "Rate limit reached. Please wait before generating another fix.", code: "RATE_LIMITED" },
+          { status: 429 },
+        );
+      }
+      if (error.status === 503) {
+        return NextResponse.json(
+          { error: "Gemini is currently experiencing high demand. Please try again in a few moments.", code: "SERVICE_UNAVAILABLE" },
+          { status: 503 },
+        );
+      }
       return NextResponse.json(
-        { error: error.message || "Gemini request failed" },
+        { error: "Gemini request failed. Please try again.", code: "GEMINI_ERROR" },
         { status: error.status ?? 502 },
       );
     }

@@ -12,6 +12,8 @@ import {
   ChevronUp,
   Sparkles,
   CircleCheck,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ReviewResponse } from "@/lib/review-schema";
@@ -197,6 +199,7 @@ export function FixPanel({ code, language, review }: FixPanelProps) {
   const [fixResult, setFixResult] = useState<FixResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
   const hasFindings =
@@ -209,6 +212,7 @@ export function FixPanel({ code, language, review }: FixPanelProps) {
   async function handleGenerate() {
     setIsGenerating(true);
     setError(null);
+    setErrorCode(null);
     setFixResult(null);
 
     try {
@@ -228,9 +232,10 @@ export function FixPanel({ code, language, review }: FixPanelProps) {
         }),
       });
 
-      const data = (await res.json()) as FixResponse & { error?: string };
+      const data = (await res.json()) as FixResponse & { error?: string; code?: string };
 
       if (!res.ok) {
+        setErrorCode(data.code ?? null);
         throw new Error(data.error ?? "Failed to generate fix");
       }
 
@@ -335,8 +340,29 @@ export function FixPanel({ code, language, review }: FixPanelProps) {
       {/* ── Error state ── */}
       {error && !isGenerating && (
         <div className="px-6 py-4">
-          <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-300">
-            {error}
+          <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[0.08] px-4 py-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-rose-300">
+                  {errorCode === "RATE_LIMITED"
+                    ? "Rate limit reached"
+                    : errorCode === "SERVICE_UNAVAILABLE"
+                    ? "Service unavailable"
+                    : "Fix generation failed"}
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-rose-300/70">{error}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isGenerating || !hasFindings}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition hover:border-rose-400/50 hover:bg-rose-400/20 hover:text-rose-200 disabled:pointer-events-none disabled:opacity-50"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       )}

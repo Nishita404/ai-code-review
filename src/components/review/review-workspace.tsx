@@ -3,7 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { FileUp, History, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { AlertTriangle, FileUp, History, Loader2, RefreshCw, RotateCcw, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -174,6 +174,7 @@ export function ReviewWorkspace() {
   const [isManualLanguage, setIsManualLanguage] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewErrorCode, setReviewErrorCode] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<ReviewResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadedFile, setUploadedFile] = useState<{
@@ -263,6 +264,7 @@ export function ReviewWorkspace() {
     }
     setIsReviewing(true);
     setReviewError(null);
+    setReviewErrorCode(null);
     setSelectedReviewId(null);
 
     try {
@@ -273,8 +275,12 @@ export function ReviewWorkspace() {
       });
       const data = (await response.json()) as ReviewResponse & {
         error?: string;
+        code?: string;
       };
-      if (!response.ok) throw new Error(data.error ?? "Review request failed");
+      if (!response.ok) {
+        setReviewErrorCode(data.code ?? null);
+        throw new Error(data.error ?? "Review request failed");
+      }
       setReviewResult(data);
       fetchHistory();
     } catch (error) {
@@ -536,8 +542,31 @@ export function ReviewWorkspace() {
               <CardContent className="px-5 pb-5">
                 {/* Error banner */}
                 {reviewError && (
-                  <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
-                    {reviewError}
+                  <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/[0.08] px-4 py-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-rose-300">
+                          {reviewErrorCode === "RATE_LIMITED"
+                            ? "Rate limit reached"
+                            : reviewErrorCode === "SERVICE_UNAVAILABLE"
+                            ? "Service unavailable"
+                            : "Review failed"}
+                        </p>
+                        <p className="mt-0.5 text-xs leading-5 text-rose-300/70">
+                          {reviewError}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleReview}
+                        disabled={isReviewing || !code.trim()}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition hover:border-rose-400/50 hover:bg-rose-400/20 hover:text-rose-200 disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Retry
+                      </button>
+                    </div>
                   </div>
                 )}
 
