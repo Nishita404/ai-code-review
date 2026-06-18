@@ -5,6 +5,7 @@ import { reviewRequestSchema, reviewResponseJsonSchema, reviewResponseSchema } f
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/db";
 import { review } from "@/db/schema";
+import { withGeminiRetry } from "@/lib/gemini-retry";
 
 const reviewModel = "gemini-2.5-flash";
 
@@ -86,17 +87,19 @@ export async function POST(request: Request) {
     const ai = new GoogleGenAI({ apiKey });
     const { code, language } = parsedBody.data;
 
-    const response = await ai.models.generateContent({
-      model: reviewModel,
-      contents: buildReviewPrompt(code, language),
-      config: {
-        temperature: 0.2,
-        systemInstruction:
-          "You are an expert code reviewer. Respond with only valid JSON matching the required schema. Do not include markdown, code fences, or extra text.",
-        responseMimeType: "application/json",
-        responseJsonSchema: reviewResponseJsonSchema,
-      },
-    });
+    const response = await withGeminiRetry(() =>
+      ai.models.generateContent({
+        model: reviewModel,
+        contents: buildReviewPrompt(code, language),
+        config: {
+          temperature: 0.2,
+          systemInstruction:
+            "You are an expert code reviewer. Respond with only valid JSON matching the required schema. Do not include markdown, code fences, or extra text.",
+          responseMimeType: "application/json",
+          responseJsonSchema: reviewResponseJsonSchema,
+        },
+      })
+    );
 
     const text = response.text;
 

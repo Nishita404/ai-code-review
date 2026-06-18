@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ApiError, GoogleGenAI } from "@google/genai";
 import { fixRequestSchema, fixResponseJsonSchema, fixResponseSchema } from "@/lib/fix-schema";
+import { withGeminiRetry } from "@/lib/gemini-retry";
 
 const fixModel = "gemini-2.5-flash";
 
@@ -84,17 +85,19 @@ export async function POST(request: Request) {
     const { code, language, findings } = parsed.data;
     const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: fixModel,
-      contents: buildFixPrompt(code, language, findings),
-      config: {
-        temperature: 0.15,
-        systemInstruction:
-          "You are an expert code fixer. Given a code review and the original source, produce a corrected version. Respond with only valid JSON matching the required schema. Do not include markdown, code fences, or extra text.",
-        responseMimeType: "application/json",
-        responseJsonSchema: fixResponseJsonSchema,
-      },
-    });
+    const response = await withGeminiRetry(() =>
+      ai.models.generateContent({
+        model: fixModel,
+        contents: buildFixPrompt(code, language, findings),
+        config: {
+          temperature: 0.15,
+          systemInstruction:
+            "You are an expert code fixer. Given a code review and the original source, produce a corrected version. Respond with only valid JSON matching the required schema. Do not include markdown, code fences, or extra text.",
+          responseMimeType: "application/json",
+          responseJsonSchema: fixResponseJsonSchema,
+        },
+      })
+    );
 
     const text = response.text;
     if (!text) {
