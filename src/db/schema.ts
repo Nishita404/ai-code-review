@@ -132,6 +132,28 @@ export const reviewProjectFile = pgTable(
   (table) => [index("review_project_file_projectId_idx").on(table.projectId)],
 );
 
+export const repoAnalysis = pgTable(
+  "repo_analysis",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    projectName: text("project_name").notNull(),
+    fileCount: integer("file_count").notNull(),
+    totalLoc: integer("total_loc").notNull(),
+    languageStats: jsonb("language_stats").$type<Record<string, number>>().notNull(),
+    securityScore: integer("security_score").notNull(),
+    maintainabilityScore: integer("maintainability_score").notNull(),
+    performanceScore: integer("performance_score").notNull(),
+    architectureScore: integer("architecture_score").notNull(),
+    metricsJson: jsonb("metrics_json").notNull(),
+    architectureJson: jsonb("architecture_json").notNull(),
+    securityJson: jsonb("security_json").notNull(),
+    performanceJson: jsonb("performance_json").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("repo_analysis_userId_idx").on(table.userId)],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -139,6 +161,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   reviews: many(review),
   reviewProjects: many(reviewProject),
+  repoAnalyses: many(repoAnalysis),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -174,5 +197,12 @@ export const reviewProjectFileRelations = relations(reviewProjectFile, ({ one })
   project: one(reviewProject, {
     fields: [reviewProjectFile.projectId],
     references: [reviewProject.id],
+  }),
+}));
+
+export const repoAnalysisRelations = relations(repoAnalysis, ({ one }) => ({
+  user: one(user, {
+    fields: [repoAnalysis.userId],
+    references: [user.id],
   }),
 }));

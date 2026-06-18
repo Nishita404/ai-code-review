@@ -4,12 +4,13 @@ import { useState } from "react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ReviewWorkspace } from "@/components/review/review-workspace";
 import { ZipUploadPanel } from "@/components/review/zip-upload-panel";
+import { RepoUploadPanel } from "@/components/review/repo-upload-panel";
 import { cn } from "@/lib/cn";
-import { Code2, FolderArchive, ArrowLeft } from "lucide-react";
+import { Code2, FolderArchive, ArrowLeft, BarChart3 } from "lucide-react";
 import Link from "next/link";
 
 export default function ReviewPage() {
-  const [activeTab, setActiveTab] = useState<"single" | "zip">("single");
+  const [activeTab, setActiveTab] = useState<"single" | "zip" | "repo">("single");
 
   return (
     <AuthGuard>
@@ -56,6 +57,19 @@ export default function ReviewPage() {
                 <FolderArchive className="h-3.5 w-3.5" />
                 ZIP Project
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("repo")}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold tracking-wide transition-all uppercase",
+                  activeTab === "repo"
+                    ? "bg-white text-black shadow-lg"
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Repo Audit
+              </button>
             </div>
           </div>
         </div>
@@ -64,9 +78,13 @@ export default function ReviewPage() {
         <div className="flex-grow relative z-10">
           {activeTab === "single" ? (
             <ReviewWorkspace />
-          ) : (
+          ) : activeTab === "zip" ? (
             <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
               <ZipUploadPanel />
+            </div>
+          ) : (
+            <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
+              <RepoUploadPanel />
             </div>
           )}
         </div>
