@@ -305,10 +305,7 @@ export function ReviewWorkspace() {
   const activeReview = reviewResult ?? emptyReviewState;
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      {/* Subtle radial background */}
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.03),transparent_35%)]" />
-
+    <div className="w-full">
       {/* History drawer (overlay — does not affect layout) */}
       <ReviewHistoryPanel
         reviews={savedReviews}
@@ -667,6 +664,6 @@ export function ReviewWorkspace() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

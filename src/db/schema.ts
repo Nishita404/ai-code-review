@@ -100,12 +100,45 @@ export const review = pgTable(
   (table) => [index("review_userId_idx").on(table.userId)],
 );
 
+export const reviewProject = pgTable(
+  "review_project",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    projectName: text("project_name").notNull(),
+    fileCount: integer("file_count").notNull(),
+    languageStats: jsonb("language_stats").$type<Record<string, number>>().notNull(),
+    overallScore: integer("overall_score").notNull(),
+    summary: text("summary").notNull(),
+    reviewJson: jsonb("review_json").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("review_project_userId_idx").on(table.userId)],
+);
+
+export const reviewProjectFile = pgTable(
+  "review_project_file",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => reviewProject.id, { onDelete: "cascade" }),
+    filePath: text("file_path").notNull(),
+    language: text("language").notNull(),
+    score: integer("score").notNull(),
+    reviewJson: jsonb("review_json").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("review_project_file_projectId_idx").on(table.projectId)],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   reviews: many(review),
+  reviewProjects: many(reviewProject),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -126,5 +159,20 @@ export const reviewRelations = relations(review, ({ one }) => ({
   user: one(user, {
     fields: [review.userId],
     references: [user.id],
+  }),
+}));
+
+export const reviewProjectRelations = relations(reviewProject, ({ one, many }) => ({
+  user: one(user, {
+    fields: [reviewProject.userId],
+    references: [user.id],
+  }),
+  files: many(reviewProjectFile),
+}));
+
+export const reviewProjectFileRelations = relations(reviewProjectFile, ({ one }) => ({
+  project: one(reviewProject, {
+    fields: [reviewProjectFile.projectId],
+    references: [reviewProject.id],
   }),
 }));
