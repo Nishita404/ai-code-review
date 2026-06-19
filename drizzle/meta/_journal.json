@@ -15,6 +15,13 @@
       "when": 1781761421088,
       "tag": "0001_parallel_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781845975571,
+      "tag": "0002_goofy_mandarin",
+      "breakpoints": true
     }
   ]
 }

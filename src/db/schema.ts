@@ -190,6 +190,10 @@ export const githubRepositories = pgTable(
     isPrivate: boolean("is_private").notNull(),
     htmlUrl: text("html_url").notNull(),
     description: text("description"),
+    language: text("language"),
+    stars: integer("stars").default(0).notNull(),
+    cloneLocation: text("clone_location"),
+    lastClonedAt: timestamp("last_cloned_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
