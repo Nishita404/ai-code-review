@@ -10,6 +10,8 @@ export const issueSchema = z.object({
   severity: z.enum(["low", "medium", "high", "critical"]),
   explanation: z.string(),
   fix: z.string(),
+  filePath: z.string().optional(),
+  lineNumber: z.number().optional(),
 });
 
 export const reviewResponseSchema = z.object({

@@ -16,6 +16,7 @@ function buildPrReviewPrompt(
   prTitle: string,
   files: { path: string; content: string; language: string }[]
 ) {
+  const fileList = files.map((f) => `- ${f.path}`).join("\n");
   const fileBlocks = files
     .map(
       (f) =>
@@ -26,7 +27,10 @@ function buildPrReviewPrompt(
   return `You are an expert Pull Request code reviewer.
 Review the following changed files in the Pull Request titled "${prTitle}".
 
-Analyze the changes across all files and generate a structured review:
+Changed files in this PR:
+${fileList}
+
+Analyze the changes and generate a structured review:
 - bugs: logic errors, edge cases, null/undefined risks, incorrect behavior in the changed code
 - security: injection, auth, secrets, unsafe input handling, data exposure in the changed code
 - performance: unnecessary work, memory leaks, inefficient algorithms in the changed code
@@ -37,8 +41,13 @@ Scoring:
 - score: integer from 0 to 100 reflecting overall health of the code changes
 - summary: one or two sentences summarizing the pull request review
 
-For each issue include a clear title, severity (low, medium, high, or critical), explanation, and a concrete fix.
-Specify which file and line/context the issue refers to in the explanation if applicable.
+For EVERY issue in bugs, security, performance, and quality you MUST provide:
+- title: concise issue title
+- severity: one of "low", "medium", "high", or "critical"
+- explanation: description of the problem with enough context to understand it
+- fix: a concrete, actionable fix
+- filePath: the EXACT filename from the changed files list above where the issue occurs (e.g. "src/lib/auth.ts")
+- lineNumber: your best estimate of the line number in that file where the issue occurs (integer). If uncertain, use the approximate line.
 
 Return only valid JSON. Do not include markdown, code fences, or extra text.
 

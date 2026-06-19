@@ -235,6 +235,30 @@ export const prReviews = pgTable(
   ],
 );
 
+export const prCommentHistory = pgTable(
+  "pr_comment_history",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    prReviewId: text("pr_review_id")
+      .notNull()
+      .references(() => prReviews.id, { onDelete: "cascade" }),
+    githubCommentId: text("github_comment_id"),
+    filePath: text("file_path").notNull(),
+    lineNumber: integer("line_number"),
+    body: text("body").notNull(),
+    status: text("status").notNull(), // 'success' | 'failed'
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("pr_comment_history_userId_idx").on(table.userId),
+    index("pr_comment_history_prReviewId_idx").on(table.prReviewId),
+  ],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ one, many }) => ({
@@ -248,6 +272,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
     references: [githubAccounts.userId],
   }),
   prReviews: many(prReviews),
+  prCommentHistory: many(prCommentHistory),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -309,7 +334,7 @@ export const githubRepositoriesRelations = relations(githubRepositories, ({ one,
   prReviews: many(prReviews),
 }));
 
-export const prReviewsRelations = relations(prReviews, ({ one }) => ({
+export const prReviewsRelations = relations(prReviews, ({ one, many }) => ({
   user: one(user, {
     fields: [prReviews.userId],
     references: [user.id],
@@ -317,5 +342,17 @@ export const prReviewsRelations = relations(prReviews, ({ one }) => ({
   repository: one(githubRepositories, {
     fields: [prReviews.repoId],
     references: [githubRepositories.id],
+  }),
+  commentHistory: many(prCommentHistory),
+}));
+
+export const prCommentHistoryRelations = relations(prCommentHistory, ({ one }) => ({
+  user: one(user, {
+    fields: [prCommentHistory.userId],
+    references: [user.id],
+  }),
+  prReview: one(prReviews, {
+    fields: [prCommentHistory.prReviewId],
+    references: [prReviews.id],
   }),
 }));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   GitPullRequest,
   GitBranch,
@@ -8,10 +8,8 @@ import {
   Loader2,
   AlertTriangle,
   Sparkles,
-  CheckCircle2,
   ArrowLeft,
   RefreshCw,
-  Star,
   ShieldAlert,
   Zap,
   Bug,
@@ -20,6 +18,14 @@ import {
   ExternalLink,
   ChevronRight,
   Eye,
+  MessageSquarePlus,
+  CheckSquare,
+  Square,
+  Send,
+  CheckCircle2,
+  XCircle,
+  History,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -61,6 +67,7 @@ type PRDetail = {
   author: string;
   avatarUrl?: string;
   branch: string;
+  commitSha: string;
   createdAt: string;
   htmlUrl: string;
   changedFiles: {
@@ -78,6 +85,27 @@ type DBReview = {
   reviewJson: ReviewResponse;
   createdAt: string;
   updatedAt: string;
+};
+
+type CommentHistoryEntry = {
+  id: string;
+  githubCommentId: string | null;
+  filePath: string;
+  lineNumber: number | null;
+  body: string;
+  status: "success" | "failed";
+  error: string | null;
+  createdAt: string;
+};
+
+// Each selectable comment in the preview table
+type PreviewComment = {
+  key: string; // unique key = category-index
+  filePath: string;
+  lineNumber: number | null;
+  body: string;
+  severity: string;
+  selected: boolean;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -118,6 +146,45 @@ function scoreBg(score: number) {
   return "border-rose-400/20 bg-rose-400/10 text-rose-300";
 }
 
+/** Convert a ReviewIssue into a GitHub-style comment body */
+function buildCommentBody(issue: ReviewIssue, category: string): string {
+  const sev = issue.severity.toUpperCase();
+  return [
+    `**[AI Review — ${category}] ${issue.title}** \`${sev}\``,
+    "",
+    issue.explanation,
+    "",
+    `**Suggested fix:** ${issue.fix}`,
+  ].join("\n");
+}
+
+/** Flatten all issues from a review result into selectable preview comments */
+function buildPreviewComments(review: ReviewResponse): PreviewComment[] {
+  const categories: { key: keyof ReviewResponse; label: string }[] = [
+    { key: "bugs", label: "Bug" },
+    { key: "security", label: "Security" },
+    { key: "performance", label: "Performance" },
+    { key: "quality", label: "Quality" },
+  ];
+
+  const comments: PreviewComment[] = [];
+  for (const { key, label } of categories) {
+    const items = review[key] as ReviewIssue[];
+    if (!Array.isArray(items)) continue;
+    items.forEach((issue, idx) => {
+      comments.push({
+        key: `${key}-${idx}`,
+        filePath: issue.filePath ?? "general",
+        lineNumber: issue.lineNumber ?? null,
+        body: buildCommentBody(issue, label),
+        severity: issue.severity,
+        selected: true,
+      });
+    });
+  }
+  return comments;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function IssueCard({ item }: { item: ReviewIssue }) {
@@ -135,7 +202,16 @@ function IssueCard({ item }: { item: ReviewIssue }) {
           {item.severity}
         </span>
       </div>
-      {item.explanation && <p className="mt-2 text-xs leading-5 text-slate-400">{item.explanation}</p>}
+      {item.explanation && (
+        <p className="mt-2 text-xs leading-5 text-slate-400">{item.explanation}</p>
+      )}
+      {(item.filePath || item.lineNumber) && (
+        <p className="mt-1.5 flex items-center gap-1 text-[10px] font-mono text-slate-500">
+          <MapPin className="h-3 w-3 shrink-0" />
+          {item.filePath ?? ""}
+          {item.lineNumber ? `:${item.lineNumber}` : ""}
+        </p>
+      )}
       {item.fix && (
         <p className="mt-2 text-xs leading-5 text-emerald-300/80">
           <span className="font-semibold text-emerald-400">Fix: </span>
@@ -156,7 +232,7 @@ function IssueSection({
   label: string;
   items: ReviewIssue[];
   isLoading: boolean;
-  icon: any;
+  icon: React.ElementType;
   accentColor: string;
 }) {
   const count = items?.length ?? 0;
@@ -192,6 +268,295 @@ function IssueSection({
   );
 }
 
+// ── Comment Preview Table ────────────────────────────────────────────────────
+
+function CommentPreviewPanel({
+  prReviewId,
+  commitSha,
+  repoId,
+  prNumber,
+  reviewResult,
+  onHistoryUpdate,
+}: {
+  prReviewId: string;
+  commitSha: string;
+  repoId: string;
+  prNumber: number;
+  reviewResult: ReviewResponse;
+  onHistoryUpdate: () => void;
+}) {
+  const [comments, setComments] = useState<PreviewComment[]>(() =>
+    buildPreviewComments(reviewResult)
+  );
+  const [isPosting, setIsPosting] = useState(false);
+  const [postResults, setPostResults] = useState<
+    { key: string; status: "success" | "failed"; error: string | null }[]
+  >([]);
+
+  // Reset when reviewResult changes
+  useEffect(() => {
+    setComments(buildPreviewComments(reviewResult));
+    setPostResults([]);
+  }, [reviewResult]);
+
+  const selectedComments = comments.filter((c) => c.selected);
+  const allSelected = comments.length > 0 && comments.every((c) => c.selected);
+
+  const toggleAll = () => {
+    setComments((prev) => prev.map((c) => ({ ...c, selected: !allSelected })));
+  };
+
+  const toggleOne = (key: string) => {
+    setComments((prev) =>
+      prev.map((c) => (c.key === key ? { ...c, selected: !c.selected } : c))
+    );
+  };
+
+  const handlePost = async () => {
+    if (selectedComments.length === 0) {
+      toast.error("Select at least one comment to post.");
+      return;
+    }
+    setIsPosting(true);
+    setPostResults([]);
+    try {
+      const res = await fetch("/api/repo-analysis/pr/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repoId,
+          prNumber,
+          prReviewId,
+          commitSha,
+          comments: selectedComments.map((c) => ({
+            filePath: c.filePath,
+            lineNumber: c.lineNumber,
+            body: c.body,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const results = (data.results as { filePath: string; lineNumber: number | null; body: string; status: string; error: string | null }[]).map(
+          (r, idx) => ({
+            key: selectedComments[idx]?.key ?? `result-${idx}`,
+            status: r.status as "success" | "failed",
+            error: r.error,
+          })
+        );
+        setPostResults(results);
+
+        const { success, failed } = data.summary;
+        if (failed === 0) {
+          toast.success(`All ${success} comment${success > 1 ? "s" : ""} posted to GitHub!`);
+        } else if (success > 0) {
+          toast.warning(`${success} posted, ${failed} failed.`);
+        } else {
+          toast.error(`All ${failed} comments failed to post.`);
+        }
+        onHistoryUpdate();
+      } else {
+        toast.error(data.error || "Failed to post comments.");
+      }
+    } catch {
+      toast.error("Network error while posting comments.");
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  if (comments.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-8 text-center">
+        <MessageSquarePlus className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+        <p className="text-xs text-slate-500">No findings to post as comments.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={toggleAll}
+          className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-white transition-colors"
+        >
+          {allSelected ? (
+            <CheckSquare className="h-3.5 w-3.5 text-indigo-400" />
+          ) : (
+            <Square className="h-3.5 w-3.5" />
+          )}
+          {allSelected ? "Deselect all" : "Select all"} ({comments.length})
+        </button>
+
+        <Button
+          onClick={handlePost}
+          disabled={isPosting || selectedComments.length === 0}
+          className="h-8 text-[11px] gap-1.5 px-4"
+        >
+          {isPosting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5" />
+          )}
+          {isPosting
+            ? "Posting..."
+            : `Post ${selectedComments.length} Comment${selectedComments.length !== 1 ? "s" : ""}`}
+        </Button>
+      </div>
+
+      {/* Comment rows */}
+      <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1 [scrollbar-width:thin]">
+        {comments.map((comment) => {
+          const result = postResults.find((r) => r.key === comment.key);
+          return (
+            <div
+              key={comment.key}
+              onClick={() => !result && toggleOne(comment.key)}
+              className={cn(
+                "flex items-start gap-3 rounded-xl border p-3 transition-all text-xs",
+                result?.status === "success"
+                  ? "border-emerald-500/20 bg-emerald-500/5 cursor-default"
+                  : result?.status === "failed"
+                  ? "border-rose-500/20 bg-rose-500/5 cursor-default"
+                  : comment.selected
+                  ? "border-indigo-500/30 bg-indigo-500/5 cursor-pointer hover:border-indigo-500/50"
+                  : "border-white/[0.06] bg-white/[0.01] cursor-pointer hover:border-white/10"
+              )}
+            >
+              {/* Checkbox / Status indicator */}
+              <div className="mt-0.5 shrink-0">
+                {result?.status === "success" ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                ) : result?.status === "failed" ? (
+                  <XCircle className="h-4 w-4 text-rose-400" />
+                ) : comment.selected ? (
+                  <CheckSquare className="h-4 w-4 text-indigo-400" />
+                ) : (
+                  <Square className="h-4 w-4 text-slate-600" />
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={cn(
+                      "text-[9px] font-bold uppercase tracking-[0.2em]",
+                      severityColor(comment.severity)
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-1.5 w-1.5 rounded-full mr-1",
+                        severityDot(comment.severity)
+                      )}
+                    />
+                    {comment.severity}
+                  </span>
+                  <span className="font-mono text-[10px] text-slate-500">
+                    {comment.filePath}
+                    {comment.lineNumber ? `:${comment.lineNumber}` : ""}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-4 text-slate-300 line-clamp-2 whitespace-pre-line">
+                  {comment.body.split("\n")[0]}
+                </p>
+                {result?.error && (
+                  <p className="text-[10px] text-rose-400 mt-0.5">{result.error}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Comment History Panel ────────────────────────────────────────────────────
+
+function CommentHistoryPanel({ prReviewId }: { prReviewId: string }) {
+  const [history, setHistory] = useState<CommentHistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/repo-analysis/pr/comments?prReviewId=${encodeURIComponent(prReviewId)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data.history ?? []);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setIsLoading(false);
+    }
+  }, [prReviewId]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <p className="text-xs text-slate-500 py-4 text-center">
+        No comments posted yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 [scrollbar-width:thin]">
+      {history.map((entry) => (
+        <div
+          key={entry.id}
+          className={cn(
+            "flex items-start gap-3 rounded-xl border p-3 text-xs",
+            entry.status === "success"
+              ? "border-emerald-500/20 bg-emerald-500/5"
+              : "border-rose-500/20 bg-rose-500/5"
+          )}
+        >
+          {entry.status === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+          ) : (
+            <XCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+          )}
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="font-mono text-[10px] text-slate-400">
+              {entry.filePath}
+              {entry.lineNumber ? `:${entry.lineNumber}` : ""}
+            </p>
+            <p className="text-[11px] leading-4 text-slate-300 line-clamp-1">
+              {entry.body.split("\n")[0]}
+            </p>
+            {entry.error && (
+              <p className="text-[10px] text-rose-400">{entry.error}</p>
+            )}
+            <p className="text-[9px] text-slate-600">
+              {new Date(entry.createdAt).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function PrReviewPanel() {
@@ -203,6 +568,10 @@ export function PrReviewPanel() {
   const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null);
   const [prReview, setPrReview] = useState<DBReview | null>(null);
+
+  // Comment panel state
+  const [activeTab, setActiveTab] = useState<"findings" | "preview" | "history">("findings");
+  const [historyKey, setHistoryKey] = useState(0); // increment to re-fetch history
 
   // Loading & Error states
   const [isPageLoading, setIsPageLoading] = useState(true);
@@ -287,12 +656,10 @@ export function PrReviewPanel() {
         setRepos(data.repos ?? []);
         toast.success("GitHub repositories synced successfully!");
         if (data.repos && data.repos.length > 0) {
-          // Keep current selection or default
           const exists = data.repos.some((r: Repo) => r.id === selectedRepoId);
           if (!exists) {
             setSelectedRepoId(data.repos[0].id);
           } else {
-            // Refetch pulls for selection
             fetchPullRequests(selectedRepoId);
           }
         }
@@ -312,6 +679,7 @@ export function PrReviewPanel() {
     setSelectedPR(pr);
     setIsDetailLoading(true);
     setReviewError(null);
+    setActiveTab("findings");
     try {
       const res = await fetch(`/api/github/repos/${selectedRepoId}/pulls/${pr.number}`);
       if (res.ok) {
@@ -347,9 +715,7 @@ export function PrReviewPanel() {
       const data = await res.json();
       if (res.ok) {
         toast.success("Pull Request review completed!");
-        // Refresh details
         handleSelectPR(selectedPR);
-        // Refresh pulls list to show score
         fetchPullRequests(selectedRepoId);
       } else {
         setReviewError(data.error || "An error occurred during review.");
@@ -394,11 +760,16 @@ export function PrReviewPanel() {
             </div>
             <h2 className="text-lg font-semibold text-white">Link GitHub Profile</h2>
             <p className="mt-1.5 text-xs text-slate-400 max-w-[400px] mx-auto leading-5">
-              Connect your account to access and review your pull requests. Fetch branch diffs, inspect changed files, and run code reviews.
+              Connect your account to access and review your pull requests. Fetch branch diffs,
+              inspect changed files, and run code reviews.
             </p>
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-4">
-            <Button variant="secondary" onClick={handleConnect} className="h-10 text-xs gap-1.5 px-6 mx-auto">
+            <Button
+              variant="secondary"
+              onClick={handleConnect}
+              className="h-10 text-xs gap-1.5 px-6 mx-auto"
+            >
               <Link2 className="h-4 w-4" />
               Connect GitHub Account
             </Button>
@@ -498,7 +869,7 @@ export function PrReviewPanel() {
                 </CardHeader>
 
                 <CardContent className="px-5 py-5 space-y-5">
-                  {/* Analysis details / summary */}
+                  {/* Summary */}
                   {reviewResult ? (
                     <div className="space-y-4">
                       <div>
@@ -510,7 +881,6 @@ export function PrReviewPanel() {
                         </p>
                       </div>
 
-                      {/* Suggestions list */}
                       {reviewResult.suggestions && reviewResult.suggestions.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500">
@@ -534,16 +904,19 @@ export function PrReviewPanel() {
                       <GitPullRequest className="h-10 w-10 text-slate-600 mb-3" />
                       <p className="text-sm font-medium text-slate-300">No Review Run Yet</p>
                       <p className="text-xs text-slate-500 mt-1 max-w-[280px]">
-                        Run the AI audit engine to scan the changed files and generate report cards.
+                        Run the AI audit engine to scan the changed files and generate report
+                        cards.
                       </p>
                     </div>
                   )}
 
-                  {/* Review Button & Loading State */}
+                  {/* Review Button */}
                   {isReviewing ? (
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-6 text-center">
                       <Loader2 className="h-6 w-6 animate-spin text-emerald-400 mb-2" />
-                      <h4 className="text-xs font-semibold text-emerald-300">Auditing Changed Files</h4>
+                      <h4 className="text-xs font-semibold text-emerald-300">
+                        Auditing Changed Files
+                      </h4>
                       <p className="text-[10px] text-slate-500 mt-0.5 animate-pulse">
                         Scanning PR diff and checking with Gemini 2.5 Flash...
                       </p>
@@ -574,38 +947,100 @@ export function PrReviewPanel() {
                 </CardContent>
               </Card>
 
-              {/* Categorized Findings Cards */}
-              {reviewResult && (
-                <div className="space-y-4">
-                  <IssueSection
-                    label="Bugs"
-                    items={reviewResult.bugs}
-                    isLoading={isReviewing}
-                    icon={Bug}
-                    accentColor="text-rose-400"
-                  />
-                  <IssueSection
-                    label="Security findings"
-                    items={reviewResult.security}
-                    isLoading={isReviewing}
-                    icon={ShieldAlert}
-                    accentColor="text-orange-400"
-                  />
-                  <IssueSection
-                    label="Performance findings"
-                    items={reviewResult.performance}
-                    isLoading={isReviewing}
-                    icon={Zap}
-                    accentColor="text-blue-400"
-                  />
-                  <IssueSection
-                    label="Code quality findings"
-                    items={reviewResult.quality}
-                    isLoading={isReviewing}
-                    icon={FileCode}
-                    accentColor="text-violet-400"
-                  />
-                </div>
+              {/* Tabbed: Findings | Comment Preview | History */}
+              {reviewResult && prReview && (
+                <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
+                  {/* Tab bar */}
+                  <div className="flex border-b border-white/[0.06] px-5 pt-4 gap-1">
+                    {(
+                      [
+                        { id: "findings", label: "Findings", icon: Bug },
+                        { id: "preview", label: "Post Comments", icon: MessageSquarePlus },
+                        { id: "history", label: "History", icon: History },
+                      ] as { id: "findings" | "preview" | "history"; label: string; icon: React.ElementType }[]
+                    ).map(({ id, label, icon: Icon }) => (
+                      <button
+                        key={id}
+                        onClick={() => setActiveTab(id)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium rounded-t-lg border-b-2 -mb-px transition-all",
+                          activeTab === id
+                            ? "border-indigo-400 text-indigo-300"
+                            : "border-transparent text-slate-500 hover:text-slate-300"
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <CardContent className="px-5 py-5">
+                    {/* Findings tab */}
+                    {activeTab === "findings" && (
+                      <div className="space-y-4">
+                        <IssueSection
+                          label="Bugs"
+                          items={reviewResult.bugs}
+                          isLoading={isReviewing}
+                          icon={Bug}
+                          accentColor="text-rose-400"
+                        />
+                        <IssueSection
+                          label="Security findings"
+                          items={reviewResult.security}
+                          isLoading={isReviewing}
+                          icon={ShieldAlert}
+                          accentColor="text-orange-400"
+                        />
+                        <IssueSection
+                          label="Performance findings"
+                          items={reviewResult.performance}
+                          isLoading={isReviewing}
+                          icon={Zap}
+                          accentColor="text-blue-400"
+                        />
+                        <IssueSection
+                          label="Code quality findings"
+                          items={reviewResult.quality}
+                          isLoading={isReviewing}
+                          icon={FileCode}
+                          accentColor="text-violet-400"
+                        />
+                      </div>
+                    )}
+
+                    {/* Comment Preview tab */}
+                    {activeTab === "preview" && (
+                      <div>
+                        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500 mb-3">
+                          Select findings to post as GitHub review comments
+                        </p>
+                        <CommentPreviewPanel
+                          prReviewId={prReview.id}
+                          commitSha={prDetail.commitSha}
+                          repoId={selectedRepoId}
+                          prNumber={prDetail.number}
+                          reviewResult={reviewResult}
+                          onHistoryUpdate={() => setHistoryKey((k) => k + 1)}
+                        />
+                      </div>
+                    )}
+
+                    {/* History tab */}
+                    {activeTab === "history" && (
+                      <div>
+                        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-500 mb-3">
+                          Comment posting history
+                        </p>
+                        <CommentHistoryPanel
+                          key={historyKey}
+                          prReviewId={prReview.id}
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
             </div>
 
@@ -631,7 +1066,10 @@ export function PrReviewPanel() {
                           className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.04] bg-white/[0.01] p-3 text-xs"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="font-mono text-[11px] text-slate-300 truncate" title={file.filename}>
+                            <p
+                              className="font-mono text-[11px] text-slate-300 truncate"
+                              title={file.filename}
+                            >
                               {file.filename}
                             </p>
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
@@ -652,8 +1090,12 @@ export function PrReviewPanel() {
                           </div>
 
                           <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-500 tabular-nums shrink-0">
-                            {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
-                            {file.deletions > 0 && <span className="text-rose-400">-{file.deletions}</span>}
+                            {file.additions > 0 && (
+                              <span className="text-emerald-400">+{file.additions}</span>
+                            )}
+                            {file.deletions > 0 && (
+                              <span className="text-rose-400">-{file.deletions}</span>
+                            )}
                           </div>
                         </div>
                       );
@@ -723,7 +1165,8 @@ export function PrReviewPanel() {
               <GitPullRequest className="h-12 w-12 text-slate-700 mb-3" />
               <p className="text-sm font-medium text-slate-400">No Open Pull Requests</p>
               <p className="text-xs text-slate-500 mt-1 max-w-[280px]">
-                There are no open pull requests in {selectedRepo ? selectedRepo.fullName : "this repository"}.
+                There are no open pull requests in{" "}
+                {selectedRepo ? selectedRepo.fullName : "this repository"}.
               </p>
             </div>
           ) : (
@@ -736,7 +1179,9 @@ export function PrReviewPanel() {
                 >
                   <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-slate-500 font-semibold shrink-0">#{pr.number}</span>
+                      <span className="font-mono text-xs text-slate-500 font-semibold shrink-0">
+                        #{pr.number}
+                      </span>
                       <h4 className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors truncate">
                         {pr.title}
                       </h4>

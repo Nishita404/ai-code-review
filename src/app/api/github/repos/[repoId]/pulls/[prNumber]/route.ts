@@ -135,6 +135,7 @@ export async function GET(
         author: prDetails.user.login,
         avatarUrl: prDetails.user.avatar_url,
         branch: prDetails.head.ref,
+        commitSha: prDetails.head.sha,
         createdAt: prDetails.created_at,
         htmlUrl: prDetails.html_url,
         changedFiles,
