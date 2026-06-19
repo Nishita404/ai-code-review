@@ -81,7 +81,7 @@ export class ZipValidationError extends Error {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function isIgnored(filePath: string): boolean {
+export function isIgnored(filePath: string): boolean {
   // Normalise separators
   const parts = filePath.replace(/\\/g, "/").split("/");
   // Check every path segment against the ignore list
@@ -94,7 +94,7 @@ function getExtension(filename: string): string {
   return filename.slice(dotIdx + 1).toLowerCase();
 }
 
-function getReviewableLanguage(filename: string): LanguageName | null {
+export function getReviewableLanguage(filename: string): LanguageName | null {
   const ext = getExtension(filename);
   if (!ext) return null;
 

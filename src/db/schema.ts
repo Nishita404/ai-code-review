@@ -205,6 +205,36 @@ export const githubRepositories = pgTable(
   ],
 );
 
+export const prReviews = pgTable(
+  "pr_reviews",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    repoId: text("repo_id")
+      .notNull()
+      .references(() => githubRepositories.id, { onDelete: "cascade" }),
+    prNumber: integer("pr_number").notNull(),
+    prTitle: text("pr_title").notNull(),
+    prAuthor: text("pr_author").notNull(),
+    prBranch: text("pr_branch").notNull(),
+    changedFiles: jsonb("changed_files").$type<string[]>().notNull(),
+    score: integer("score"),
+    summary: text("summary"),
+    reviewJson: jsonb("review_json"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("pr_reviews_userId_idx").on(table.userId),
+    index("pr_reviews_repoId_idx").on(table.repoId),
+  ],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ one, many }) => ({
@@ -217,6 +247,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
     fields: [user.id],
     references: [githubAccounts.userId],
   }),
+  prReviews: many(prReviews),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -270,9 +301,21 @@ export const githubAccountsRelations = relations(githubAccounts, ({ one, many })
   repositories: many(githubRepositories),
 }));
 
-export const githubRepositoriesRelations = relations(githubRepositories, ({ one }) => ({
+export const githubRepositoriesRelations = relations(githubRepositories, ({ one, many }) => ({
   githubAccount: one(githubAccounts, {
     fields: [githubRepositories.githubAccountId],
     references: [githubAccounts.id],
+  }),
+  prReviews: many(prReviews),
+}));
+
+export const prReviewsRelations = relations(prReviews, ({ one }) => ({
+  user: one(user, {
+    fields: [prReviews.userId],
+    references: [user.id],
+  }),
+  repository: one(githubRepositories, {
+    fields: [prReviews.repoId],
+    references: [githubRepositories.id],
   }),
 }));

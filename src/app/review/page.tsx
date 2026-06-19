@@ -5,12 +5,13 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { ReviewWorkspace } from "@/components/review/review-workspace";
 import { ZipUploadPanel } from "@/components/review/zip-upload-panel";
 import { RepoUploadPanel } from "@/components/review/repo-upload-panel";
+import { PrReviewPanel } from "@/components/review/pr-review-panel";
 import { cn } from "@/lib/cn";
-import { Code2, FolderArchive, ArrowLeft, BarChart3 } from "lucide-react";
+import { Code2, FolderArchive, ArrowLeft, BarChart3, GitPullRequest } from "lucide-react";
 import Link from "next/link";
 
 export default function ReviewPage() {
-  const [activeTab, setActiveTab] = useState<"single" | "zip" | "repo">("single");
+  const [activeTab, setActiveTab] = useState<"single" | "zip" | "repo" | "pr">("single");
 
   return (
     <AuthGuard>
@@ -70,6 +71,19 @@ export default function ReviewPage() {
                 <BarChart3 className="h-3.5 w-3.5" />
                 Repo Audit
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("pr")}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold tracking-wide transition-all uppercase",
+                  activeTab === "pr"
+                    ? "bg-white text-black shadow-lg"
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <GitPullRequest className="h-3.5 w-3.5" />
+                PR Review
+              </button>
             </div>
           </div>
         </div>
@@ -82,9 +96,13 @@ export default function ReviewPage() {
             <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
               <ZipUploadPanel />
             </div>
-          ) : (
+          ) : activeTab === "repo" ? (
             <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
               <RepoUploadPanel />
+            </div>
+          ) : (
+            <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
+              <PrReviewPanel />
             </div>
           )}
         </div>

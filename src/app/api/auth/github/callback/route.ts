@@ -303,6 +303,8 @@ async function syncRepositories(db: any, githubAccountId: string, accessToken: s
       private: boolean;
       html_url: string;
       description?: string;
+      language?: string;
+      stargazers_count?: number;
     }[];
 
     // Delete existing repository sync logs
@@ -318,6 +320,8 @@ async function syncRepositories(db: any, githubAccountId: string, accessToken: s
         isPrivate: repo.private,
         htmlUrl: repo.html_url,
         description: repo.description || null,
+        language: repo.language || null,
+        stars: repo.stargazers_count ?? 0,
       }));
 
       // Bulk insert
